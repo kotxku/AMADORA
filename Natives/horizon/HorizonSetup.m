@@ -152,6 +152,16 @@ static NSString *download(NSURLSession *session, NSString *url, NSString *path, 
         NSString *target = [root stringByAppendingPathComponent:item];
         [fm removeItemAtPath:target error:nil];
         NSError *copyError;
+        if ([item isEqualToString:@"exporters.zip"]) {
+            // Shipped zipped (build_prepare_root.sh): loose .class files break on-device signers
+            [fm removeItemAtPath:[root stringByAppendingPathComponent:@"exporters"] error:nil];
+            UZKArchive *exporters = [[UZKArchive alloc] initWithPath:[bundledRoot() stringByAppendingPathComponent:item] error:&copyError];
+            if (!exporters || ![exporters extractFilesTo:root overwrite:YES error:&copyError]) {
+                *error = copyError.localizedDescription ?: @"Couldn't unpack Horizon's setup files.";
+                return nil;
+            }
+            continue;
+        }
         if (![fm copyItemAtPath:[bundledRoot() stringByAppendingPathComponent:item] toPath:target error:&copyError]) {
             *error = copyError.localizedDescription;
             return nil;
