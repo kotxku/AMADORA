@@ -109,10 +109,8 @@
         setButtonPointerInteraction(self.buttonInstall);
         [self.buttonInstall setTitle:localize(@"Play", nil) forState:UIControlStateNormal];
         self.buttonInstall.autoresizingMask = AUTORESIZE_MASKS;
-        self.buttonInstall.backgroundColor = [PLTheme colorForKind:PLButtonKindSuccess];
-        self.buttonInstall.layer.cornerRadius = 4;
         self.buttonInstall.frame = CGRectMake(self.toolbar.frame.size.width * 0.8, 4, self.toolbar.frame.size.width * 0.2, self.toolbar.frame.size.height - 8);
-        self.buttonInstall.tintColor = UIColor.whiteColor;
+        [PLTheme styleButton:self.buttonInstall kind:PLButtonKindSuccess];
         self.buttonInstall.enabled = NO;
         [self.buttonInstall addTarget:self action:@selector(performInstallOrShowDetails:) forControlEvents:UIControlEventPrimaryActionTriggered];
         [targetToolbar addSubview:self.progressViewMain];

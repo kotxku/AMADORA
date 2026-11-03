@@ -82,7 +82,7 @@ typedef NS_ENUM(NSInteger, SyncSection) {
     if (indexPath.section == kSyncComputer) return [self computerCellForRow:indexPath.row];
 
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"target"] ?: [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"target"];
-    cell.backgroundColor = PLTheme.background;
+    cell.backgroundColor = PLTheme.surface;
     cell.textLabel.numberOfLines = 0;
     NSString *name = self.rows[indexPath.section][indexPath.row];
     BOOL isFile = indexPath.section == kSyncFiles;
@@ -116,7 +116,7 @@ typedef NS_ENUM(NSInteger, SyncSection) {
 
 - (UITableViewCell *)computerCellForRow:(NSInteger)row {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
-    cell.backgroundColor = PLTheme.background;
+    cell.backgroundColor = PLTheme.surface;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
     if (row == 0) {
         NSURL *remote = PLSync.remoteFolder;

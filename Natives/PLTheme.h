@@ -15,6 +15,7 @@ typedef NS_ENUM(NSInteger, PLButtonKind) {
 @property(class, nonatomic, readonly) UIColor *foreground; // #f1e8ff
 @property(class, nonatomic, readonly) UIColor *muted;      // #b98cff
 @property(class, nonatomic, readonly) UIColor *accent;     // #5ee6d0: links, switches, progress
+@property(class, nonatomic, readonly) UIColor *surface;    // translucent #3b1a8f: rows and cards over the glow
 
 + (UIColor *)colorForKind:(PLButtonKind)kind;
 // Inter Regular (bundled; Pandora ships only that weight) at the given size; the system font if it failed to load
@@ -29,7 +30,7 @@ typedef NS_ENUM(NSInteger, PLButtonKind) {
 + (void)styleButton:(UIButton *)button kind:(PLButtonKind)kind;
 // Pandora's small grey section headers ("Library", "Content", ...)
 + (UILabel *)sectionHeaderLabel:(NSString *)text;
-// Rounded border-colour outline used by Pandora's panels and cards
+// A rounded glass card: Liquid Glass on iOS 26 and later, else a dark blur
 + (void)styleCard:(UIView *)view;
 
 @end

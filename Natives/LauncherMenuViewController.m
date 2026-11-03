@@ -264,7 +264,7 @@ typedef NS_ENUM(NSInteger, LauncherMenuSection) {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"cell"];
     if (cell == nil) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"cell"];
-        cell.backgroundColor = PLTheme.background;
+        cell.backgroundColor = UIColor.clearColor;
         cell.textLabel.font = [PLTheme fontOfSize:16];
         cell.textLabel.textColor = PLTheme.foreground;
         // Pandora's selection: a rounded #262626 pill inset from the sidebar edges

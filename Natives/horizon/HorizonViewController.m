@@ -81,7 +81,7 @@ typedef NS_ENUM(NSInteger, HorizonSection) {
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
-    cell.backgroundColor = PLTheme.background;
+    cell.backgroundColor = PLTheme.surface;
     cell.textLabel.font = [PLTheme fontOfSize:16];
     cell.textLabel.textColor = PLTheme.foreground;
     cell.detailTextLabel.textColor = PLTheme.muted;
