@@ -166,7 +166,10 @@ static void hook(Class cls, SEL original, SEL replacement) {
         [[UIBezierPath bezierPathWithRoundedRect:rect cornerRadius:12] addClip];
         CAGradientLayer *gradient = [CAGradientLayer layer];
         gradient.frame = rect;
-        gradient.colors = [stops valueForKey:@"CGColor"];
+        // UIColor's CGColor isn't key-value coding compliant on iOS 26
+        NSMutableArray *colors = [NSMutableArray new];
+        for (UIColor *stop in stops) [colors addObject:(id)stop.CGColor];
+        gradient.colors = colors;
         gradient.startPoint = CGPointMake(0, 0.5);
         gradient.endPoint = CGPointMake(1, 0.5);
         [gradient renderInContext:context.CGContext];
