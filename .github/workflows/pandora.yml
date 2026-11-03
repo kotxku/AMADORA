@@ -82,7 +82,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             ${{ runner.temp }}/horizon/target
-          key: horizon-86a60b1b-${{ hashFiles('tools/horizon/**') }}
+          key: horizon-86a60b1b-${{ hashFiles('tools/horizon/*.patch', 'tools/horizon/*.py', 'tools/horizon/*.rs', 'tools/horizon/*.sh') }}
           restore-keys: horizon-86a60b1b-
 
       - name: Build Horizon for iOS

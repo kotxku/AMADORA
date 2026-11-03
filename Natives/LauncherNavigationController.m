@@ -6,6 +6,7 @@
 #import "CustomControlsViewController.h"
 #import "DownloadProgressViewController.h"
 #import "installer/ModDoctor.h"
+#import "horizon/HorizonGame.h"
 #import "JavaGUIViewController.h"
 #import "LauncherMenuViewController.h"
 #import "LauncherNavigationController.h"
@@ -301,6 +302,12 @@
     }
 
     NSString *versionId = PLProfiles.current.profiles[self.versionTextField.text][@"lastVersionId"];
+    if ([HorizonGame isHorizonVersion:versionId]) {
+        // Started from the run loop, not inside this tap's handling: the game keeps the main run
+        // loop turning itself and doesn't return
+        [self performSelector:@selector(launchHorizon:) withObject:self.versionTextField.text afterDelay:0];
+        return;
+    }
     NSDictionary *object = [remoteVersionList filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"(id == %@)", versionId]].firstObject;
     if (!object) {
         object = @{
@@ -315,6 +322,16 @@
     } retry:^{
         [weakSelf launchMinecraft:sender];
     }];
+}
+
+- (void)launchHorizon:(NSString *)profileName {
+    NSMutableDictionary *profile = PLProfiles.current.profiles[profileName];
+    if (!profile) return;
+    // Orders the sidebar's Recent Instances, as a Java launch does
+    profile[@"lastUsed"] = [[NSISO8601DateFormatter new] stringFromDate:NSDate.date];
+    [PLProfiles.current save];
+    NSString *error = [HorizonGame startInGameDir:[PLProfiles gameDirForProfile:profile]];
+    if (error) showDialog(@"Can't start Horizon", error);
 }
 
 // Starts a download off the main thread. A main-thread timer polls the progress and success/failure arrive on the
