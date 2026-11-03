@@ -93,6 +93,8 @@ jobs:
           git checkout -q FETCH_HEAD
           cd "$GITHUB_WORKSPACE"
           bash tools/horizon/build_horizon_ios.sh "$RUNNER_TEMP/horizon" Natives/build/libhorizon_ios.dylib
+          # Horizon's exporter classes for preparing 26.3 on the device (no Mojang files ship)
+          bash tools/horizon/build_prepare_root.sh "$RUNNER_TEMP/horizon" Natives/resources/horizon-prepare
 
       - name: Build IPA
         run: |
