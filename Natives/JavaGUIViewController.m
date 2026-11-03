@@ -382,9 +382,11 @@ dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
     NSArray *manifestLines = [manifestStr componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet];
     NSString *mainClass;
     for (NSString *line in manifestLines) {
-        if ([line hasPrefix:@"Main-Class: "]) {
+        if ([line hasPrefix:@"Java-Version: "]) {
+            return _requiredJavaVersion = MAX(8, [line substringFromIndex:14].intValue);
+        }
+        if ([line hasPrefix:@"Main-Class: "] && !mainClass) {
             mainClass = [line substringFromIndex:12];
-            break;
         }
     }
     if (!mainClass) {

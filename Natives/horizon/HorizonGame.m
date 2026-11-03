@@ -491,6 +491,12 @@ static HorizonControlsView *controls;
         [NSFileManager.defaultManager createDirectoryAtPath:[[PLProfiles gameDirForProfile:profile] stringByAppendingPathComponent:folder]
             withIntermediateDirectories:YES attributes:nil error:nil];
     }
+    // Settings, graphics and Horizon's official server to start with
+    NSString *defaults = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"horizon-defaults"];
+    for (NSString *file in [NSFileManager.defaultManager contentsOfDirectoryAtPath:defaults error:nil]) {
+        [NSFileManager.defaultManager copyItemAtPath:[defaults stringByAppendingPathComponent:file]
+            toPath:[[PLProfiles gameDirForProfile:profile] stringByAppendingPathComponent:file] error:nil];
+    }
     PLProfiles.current.profiles[name] = profile;
     PLProfiles.current.selectedProfileName = name; // also saves
     return nil;

@@ -137,6 +137,7 @@ add_executable(AngelAuraAmethyst
   installer/modpack/ModrinthAPI.m
 
   horizon/HorizonGame.m
+  horizon/HorizonSetup.m
   horizon/HorizonViewController.m
 
   input/ControllerInput.m

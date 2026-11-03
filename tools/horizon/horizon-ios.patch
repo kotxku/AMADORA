@@ -1,8 +1,8 @@
 diff --git a/Cargo.lock b/Cargo.lock
-index f25b0a7..8988eb2 100644
+index f25b0a7..4f23c4d 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
-@@ -1557,6 +1557,15 @@ dependencies = [
+@@ -1557,6 +1557,16 @@ dependencies = [
   "wgpu",
  ]
  
@@ -11,6 +11,7 @@ index f25b0a7..8988eb2 100644
 +version = "0.1.0"
 +dependencies = [
 + "horizon-client",
++ "horizon-prepare",
 + "horizon-threads",
 + "winit",
 +]
@@ -18,7 +19,7 @@ index f25b0a7..8988eb2 100644
  [[package]]
  name = "horizon-items"
  version = "0.1.0"
-@@ -4978,8 +4987,6 @@ checksum = "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
+@@ -4978,8 +4988,6 @@ checksum = "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
  [[package]]
  name = "winit"
  version = "0.30.13"
@@ -50,58 +51,23 @@ index 5b0c2e4..98bd5be 100644
  # Line tables keep file:line in backtraces; full debug info made every
  # example and test binary hundreds of megabytes and slow to link.
 diff --git a/crates/horizon-client-input/Cargo.toml b/crates/horizon-client-input/Cargo.toml
-index e1d7cf7..157c633 100644
+index e1d7cf7..043eb63 100644
 --- a/crates/horizon-client-input/Cargo.toml
 +++ b/crates/horizon-client-input/Cargo.toml
-@@ -1,23 +1,25 @@
--[package]
--name = "horizon-client-input"
--version = "0.1.0"
--edition.workspace = true
--license.workspace = true
--rust-version = "1.90"
--description = "The client's input layer: key bindings and their names, mouse, controllers, clipboard and window options"
--
--[dependencies]
--horizon-client-core = { path = "../horizon-client-core" }
--winit = "0.30.13"
--# The window icon.
--horizon-theme = { path = "../horizon-theme" }
--png = "0.18"
+@@ -12,10 +12,12 @@ winit = "0.30.13"
+ # The window icon.
+ horizon-theme = { path = "../horizon-theme" }
+ png = "0.18"
 -arboard = { version = "3.6.1", default-features = false, features = ["wayland-data-control"] }
--# The DualSense's trigger effects (the `controllers` feature).
--horizon-dualsense = { path = "../horizon-dualsense", optional = true }
--
--[features]
--controllers = ["dep:horizon-dualsense"]
--
--[lints]
--workspace = true
-+[package]
-+name = "horizon-client-input"
-+version = "0.1.0"
-+edition.workspace = true
-+license.workspace = true
-+rust-version = "1.90"
-+description = "The client's input layer: key bindings and their names, mouse, controllers, clipboard and window options"
-+
-+[dependencies]
-+horizon-client-core = { path = "../horizon-client-core" }
-+winit = "0.30.13"
-+# The window icon.
-+horizon-theme = { path = "../horizon-theme" }
-+png = "0.18"
-+# The DualSense's trigger effects (the `controllers` feature).
-+horizon-dualsense = { path = "../horizon-dualsense", optional = true }
-+
+ # The DualSense's trigger effects (the `controllers` feature).
+ horizon-dualsense = { path = "../horizon-dualsense", optional = true }
+ 
 +[target.'cfg(not(target_os = "ios"))'.dependencies]
 +arboard = { version = "3.6.1", default-features = false, features = ["wayland-data-control"] }
 +
-+[features]
-+controllers = ["dep:horizon-dualsense"]
-+
-+[lints]
-+workspace = true
+ [features]
+ controllers = ["dep:horizon-dualsense"]
+ 
 diff --git a/crates/horizon-client-input/src/clipboard.rs b/crates/horizon-client-input/src/clipboard.rs
 index eaf2a22..4b01b95 100644
 --- a/crates/horizon-client-input/src/clipboard.rs
@@ -313,10 +279,10 @@ index 4f7d737..0c33892 100644
          // Safety: read-only access to handles wgpu keeps alive while these guards live.
 diff --git a/crates/horizon-ios/Cargo.toml b/crates/horizon-ios/Cargo.toml
 new file mode 100644
-index 0000000..4dcbd8f
+index 0000000..5c661a4
 --- /dev/null
 +++ b/crates/horizon-ios/Cargo.toml
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,19 @@
 +[package]
 +name = "horizon-ios"
 +version = "0.1.0"
@@ -330,6 +296,7 @@ index 0000000..4dcbd8f
 +
 +[dependencies]
 +horizon-client = { path = "../horizon-client" }
++horizon-prepare = { path = "../horizon-prepare" }
 +horizon-threads = { path = "../horizon-threads" }
 +
 +[target.'cfg(target_os = "ios")'.dependencies]
@@ -337,10 +304,10 @@ index 0000000..4dcbd8f
 +winit = "0.30.13"
 diff --git a/crates/horizon-ios/src/lib.rs b/crates/horizon-ios/src/lib.rs
 new file mode 100644
-index 0000000..7bd19fa
+index 0000000..07d2655
 --- /dev/null
 +++ b/crates/horizon-ios/src/lib.rs
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,182 @@
 +//! Horizon in an iOS app's process: the app loads this library and calls
 +//! `horizon_ios_main` on its main thread, which never returns while the game runs.
 +
@@ -418,6 +385,293 @@ index 0000000..7bd19fa
 +        amadora::has_window()
 +    }
 +}
++
++/// Preparing 26.3's resources on the device, in the app's own JVM (iOS starts no processes).
++mod prepare {
++    use std::ffi::{CStr, CString, c_char, c_int};
++    use std::path::PathBuf;
++    use std::sync::OnceLock;
++
++    /// Runs one Java task (`horizon_prepare::java::InProcess`) in the app's JVM; 0 when it worked,
++    /// else the error, NUL-terminated, in `error[..len]`.
++    type Task = extern "C" fn(c_int, *const *const c_char, *mut c_char, usize) -> c_int;
++    /// A progress line, and the fraction done (negative when unchanged).
++    type Log = extern "C" fn(*const c_char, f32);
++
++    static TASK: OnceLock<Task> = OnceLock::new();
++
++    fn task(args: &[String]) -> Result<(), String> {
++        let task = TASK.get().ok_or("No Java to run the task in")?;
++        let owned: Vec<CString> = args
++            .iter()
++            .map(|a| CString::new(a.replace('\0', "")).unwrap_or_default())
++            .collect();
++        let pointers: Vec<*const c_char> = owned.iter().map(|c| c.as_ptr()).collect();
++        let mut error = vec![0u8; 4096];
++        match task(pointers.len() as c_int, pointers.as_ptr(), error.as_mut_ptr().cast(), error.len()) {
++            0 => Ok(()),
++            _ => Err(CStr::from_bytes_until_nul(&error)
++                .map(|e| e.to_string_lossy().into_owned())
++                .unwrap_or_else(|_| "The Java task failed".into())),
++        }
++    }
++
++    fn path(p: *const c_char) -> PathBuf {
++        // SAFETY: the caller passes valid C strings.
++        PathBuf::from(unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned())
++    }
++
++    /// `horizon-prepare --prepare --complete` from the app's own copy of the game: imports the
++    /// pinned files, runs the exporters through `task`, copies the sounds and checks the result in
++    /// `output`. Returns 0 when it is complete; the reason otherwise went to `log` last.
++    ///
++    /// # Safety
++    /// Every path is a valid NUL-terminated string; `task` and `log` stay callable meanwhile.
++    #[unsafe(no_mangle)]
++    #[allow(clippy::too_many_arguments)]
++    pub unsafe extern "C" fn horizon_ios_prepare(
++        root: *const c_char,
++        minecraft_dir: *const c_char,
++        version_json: *const c_char,
++        client_jar: *const c_char,
++        libraries_dir: *const c_char,
++        assets_dir: *const c_char,
++        server_jar: *const c_char,
++        output: *const c_char,
++        run_task: Task,
++        log: Log,
++    ) -> c_int {
++        let _ = TASK.set(run_task);
++        horizon_prepare::java::set_in_process(task);
++        let say = |line: &str| {
++            let line = CString::new(line.replace('\0', "")).unwrap_or_default();
++            log(line.as_ptr(), -1.0);
++        };
++        let progress = |fraction: f32| log(c"".as_ptr(), fraction * 0.9);
++        let options = horizon_prepare::Options {
++            root: path(root),
++            import: true,
++            minecraft_dir: Some(path(minecraft_dir)),
++            server_jar: Some(path(server_jar)),
++            java_home: None,
++            inputs: horizon_prepare::artifacts::Inputs {
++                version_json: Some(path(version_json)),
++                client_jar: Some(path(client_jar)),
++                libraries_dir: Some(path(libraries_dir)),
++                assets_dir: Some(path(assets_dir)),
++            },
++            output: Some(path(output)),
++        };
++        let result = horizon_prepare::prepare_with_progress(&options, &say, &progress)
++            .and_then(|resources| {
++                horizon_prepare::add_assets(
++                    "sounds",
++                    &options.root,
++                    Some(&resources),
++                    options.minecraft_dir.as_deref(),
++                    &options.inputs,
++                    &say,
++                )?;
++                let lacking = horizon_prepare::check(&options.root, &resources)?;
++                for line in &lacking {
++                    say(line);
++                }
++                if lacking.is_empty() { Ok(()) } else { Err("The prepared files are incomplete".into()) }
++            });
++        match result {
++            Ok(()) => {
++                log(c"".as_ptr(), 1.0);
++                0
++            }
++            Err(e) => {
++                say(&format!("error: {e}"));
++                1
++            }
++        }
++    }
++}
+diff --git a/crates/horizon-prepare/src/java.rs b/crates/horizon-prepare/src/java.rs
+index 1279cc6..a4cf69d 100644
+--- a/crates/horizon-prepare/src/java.rs
++++ b/crates/horizon-prepare/src/java.rs
+@@ -14,6 +14,35 @@ pub struct Jdk {
+ 
+ const TIMEOUT: Duration = Duration::from_secs(3600);
+ 
++/// Runs a Java task in the caller's own JVM instead of a new process, for an app that can't start
++/// processes (AMADORA on iOS). Its argument lists: `["java", cwd, log, java's arguments...]`,
++/// `["worker", name, log, classpath, main, args...]` (one bootstrapped classpath per name, kept
++/// until `["close", name]`). Logs are `/dev/fd/<n>` paths of files the preparer opened.
++pub type InProcess = fn(&[String]) -> Result<(), String>;
++
++static IN_PROCESS: std::sync::OnceLock<InProcess> = std::sync::OnceLock::new();
++
++/// Sends every Java task to `run` from now on: one at a time, and with no compiler.
++pub fn set_in_process(run: InProcess) {
++    let _ = IN_PROCESS.set(run);
++}
++
++pub(crate) fn in_process() -> Option<InProcess> {
++    IN_PROCESS.get().copied()
++}
++
++/// An open log as a path a JVM in this process can open: the same file and position.
++#[cfg(unix)]
++pub(crate) fn fd_path(log: &fs::File) -> String {
++    use std::os::fd::AsRawFd;
++    format!("/dev/fd/{}", log.as_raw_fd())
++}
++
++#[cfg(not(unix))]
++pub(crate) fn fd_path(_: &fs::File) -> String {
++    String::new()
++}
++
+ /// Options for every JVM preparing starts (the exporters, the data generator, javac with `-J`).
+ /// They are short batch jobs that run side by side: the C2 compiler's background work costs
+ /// more CPU than it wins back, and the serial collector keeps their heaps small. Measured on the
+@@ -233,6 +262,12 @@ pub fn find(major: i64, more: &[PathBuf]) -> Result<Jdk, String> {
+ 
+ /// Finds a compatible runtime; precompiled exporters do not need javac.
+ pub fn find_runtime(major: i64, more: &[PathBuf]) -> Result<Jdk, String> {
++    if in_process().is_some() {
++        return Ok(Jdk {
++            javac: "javac".into(),
++            java: "java".into(),
++        });
++    }
+     find_tools(major, more, false)
+ }
+ 
+@@ -352,6 +387,9 @@ impl Jdk {
+     /// `javac --release <major> -proc:none` with Python's `subprocess.run(..., check=True,
+     /// stdout=log, stderr=STDOUT, timeout=3600)`.
+     pub fn javac(&self, major: i64, args: &[String], log: &fs::File) -> Result<(), String> {
++        if in_process().is_some() {
++            return Err("Preparing in this app needs the exporters shipped with it".into());
++        }
+         let mut command = command(&self.javac);
+         command
+             .args(BATCH_OPTIONS.map(|option| format!("-J{option}")))
+@@ -361,6 +399,12 @@ impl Jdk {
+     }
+ 
+     pub fn java(&self, args: &[String], cwd: Option<&Path>, log: &fs::File) -> Result<(), String> {
++        if let Some(run) = in_process() {
++            let cwd = cwd.map(|d| d.display().to_string()).unwrap_or_default();
++            let mut task = vec!["java".to_string(), cwd, fd_path(log)];
++            task.extend_from_slice(args);
++            return run(&task);
++        }
+         let mut command = command(&self.java);
+         command.args(BATCH_OPTIONS).args(args);
+         if let Some(dir) = cwd {
+diff --git a/crates/horizon-prepare/src/lib.rs b/crates/horizon-prepare/src/lib.rs
+index 993e41e..56c0685 100644
+--- a/crates/horizon-prepare/src/lib.rs
++++ b/crates/horizon-prepare/src/lib.rs
+@@ -453,6 +453,10 @@ impl Run<'_> {
+     /// Stops an exporter JVM once its lane needs it no more, to free its memory.
+     fn close_worker(&self, worker: usize) {
+         drop(self.workers[worker].lock().unwrap().take());
++        if let Some(run) = java::in_process() {
++            let name = ["server", "client", "server-blocks"][worker];
++            let _ = run(&["close".into(), name.into()]);
++        }
+     }
+ 
+     /// The worker of a classpath's side: 0 for the server's, 1 for the client's.
+@@ -515,6 +519,18 @@ impl Run<'_> {
+         ) && std::env::var_os("HORIZON_PREPARE_ISOLATED").is_none()
+         {
+             let name = ["server", "client", "server-blocks"][worker];
++            if let Some(run) = java::in_process() {
++                let separator = if cfg!(windows) { ";" } else { ":" };
++                let mut task = vec![
++                    "worker".to_string(),
++                    name.into(),
++                    arg(log_path),
++                    format!("{}{separator}{classpath}", classes.display()),
++                    main.into(),
++                ];
++                task.extend_from_slice(args);
++                return run(&task);
++            }
+             let mut worker = self.workers[worker].lock().unwrap();
+             if worker.is_none() {
+                 *worker = Some(worker::Worker::new(self, name, &classes, classpath)?);
+@@ -1129,19 +1145,29 @@ fn steps(
+             mkdir(&datagen)?;
+             let log_path = datagen.join("datagen.log");
+             let log = run.log_file(&log_path)?;
++            // In the app's own JVM the bundler can't start the generator: the unpacked server's
++            // classpath runs it, writing where the bundler's would.
++            let generator: Vec<String> = if java::in_process().is_some() {
++                vec![
++                    "-cp".into(),
++                    run.server_classpath.clone(),
++                    "net.minecraft.data.Main".into(),
++                    "--reports".into(),
++                    "--output".into(),
++                    arg(&datagen.join("out")),
++                ]
++            } else {
++                vec![
++                    "-DbundlerMainClass=net.minecraft.data.Main".into(),
++                    "-jar".into(),
++                    arg(&lock.directory.join("jars").join("server.jar")),
++                    "--reports".into(),
++                    "--output".into(),
++                    "out".into(),
++                ]
++            };
+             run.jdk
+-                .java(
+-                    &[
+-                        "-DbundlerMainClass=net.minecraft.data.Main".into(),
+-                        "-jar".into(),
+-                        arg(&lock.directory.join("jars").join("server.jar")),
+-                        "--reports".into(),
+-                        "--output".into(),
+-                        "out".into(),
+-                    ],
+-                    Some(&datagen),
+-                    &log,
+-                )
++                .java(&generator, Some(&datagen), &log)
+                 .map_err(|e| format!("{e} in the data generator; see {}", log_path.display()))?;
+             let reports = datagen.join("out").join("reports");
+             install_datagen_reports(root, &reports)?;
+diff --git a/crates/horizon-prepare/src/main.rs b/crates/horizon-prepare/src/main.rs
+index 786c74b..11ce7cc 100644
+--- a/crates/horizon-prepare/src/main.rs
++++ b/crates/horizon-prepare/src/main.rs
+@@ -129,7 +129,9 @@ fn main() -> ExitCode {
+             }
+         };
+         let parsed = match flag.as_str() {
+-            "--prepare" | "--server-jar" | "--check" if assets.is_some() => {
++            "--prepare" | "--server-jar" | "--check"
++                if assets.as_deref().is_some_and(|a| a != "compile-exporters") =>
++            {
+                 Err(format!("{flag} is for preparing, not for asset copying"))
+             }
+             "--prepare" if inline.is_none() => {
+diff --git a/crates/horizon-prepare/src/pool.rs b/crates/horizon-prepare/src/pool.rs
+index f599856..e98e965 100644
+--- a/crates/horizon-prepare/src/pool.rs
++++ b/crates/horizon-prepare/src/pool.rs
+@@ -7,6 +7,10 @@ use std::sync::Mutex;
+ /// How many threads each copying, hashing or compiling step spreads over: HORIZON_PREPARE_JOBS,
+ /// else the processors (at most 8). With 1 the lanes run one after another too.
+ pub(crate) fn jobs() -> usize {
++    // One JVM shared by every task: they take turns.
++    if crate::java::in_process().is_some() {
++        return 1;
++    }
+     std::env::var("HORIZON_PREPARE_JOBS")
+         .ok()
+         .and_then(|n| n.trim().parse::<usize>().ok())
 diff --git a/crates/horizon-threads/src/memory_limit.rs b/crates/horizon-threads/src/memory_limit.rs
 index 41ecb4d..25371a5 100644
 --- a/crates/horizon-threads/src/memory_limit.rs
@@ -440,3 +694,82 @@ index 41ecb4d..25371a5 100644
  )))]
  pub fn resident_bytes() -> Option<u64> {
      None
+diff --git a/mods/horizon/src/test/java/dev/horizonlab/parity/PrepareWorker.java b/mods/horizon/src/test/java/dev/horizonlab/parity/PrepareWorker.java
+index 26104bb..3b58fe6 100644
+--- a/mods/horizon/src/test/java/dev/horizonlab/parity/PrepareWorker.java
++++ b/mods/horizon/src/test/java/dev/horizonlab/parity/PrepareWorker.java
+@@ -32,33 +32,14 @@ public final class PrepareWorker {
+         // Bootstrap replaces System.out. Keep the protocol on the original descriptor.
+         var replies = new PrintWriter(new OutputStreamWriter(new FileOutputStream(FileDescriptor.out), StandardCharsets.UTF_8), true);
+         System.setOut(System.err);
+-        net.minecraft.SharedConstants.tryDetectVersion();
+-        net.minecraft.server.Bootstrap.bootStrap();
+-        var resets = new ArrayList<Runnable>();
+-        for (var registry : BuiltInRegistries.REGISTRY) resets.add(restoreTags(registry));
+-        System.setProperty("horizon.prepare.reuse", "true");
++        var reset = init();
+         try (var input = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
+             for (String line; (line = input.readLine()) != null;) {
+                 var task = JsonParser.parseString(line).getAsJsonArray();
+-                var previousOut = System.out; var previousErr = System.err;
+-                String error = "";
+-                try (var log = new PrintStream(Files.newOutputStream(Path.of(task.get(0).getAsString()),
+-                        StandardOpenOption.CREATE, StandardOpenOption.APPEND), true, StandardCharsets.UTF_8)) {
+-                    System.setOut(log); System.setErr(log);
+-                    try {
+-                        var values = task.get(2).getAsJsonArray();
+-                        var argv = new String[values.size()];
+-                        for (int i = 0; i < argv.length; i++) argv[i] = values.get(i).getAsString();
+-                        Class.forName("dev.horizonlab.parity." + task.get(1).getAsString())
+-                            .getMethod("main", String[].class).invoke(null, (Object) argv);
+-                    } catch (Throwable failure) {
+-                        failure.printStackTrace(log); error = failure.toString();
+-                    } finally {
+-                        for (var reset : resets) reset.run();
+-                    }
+-                } finally {
+-                    System.setOut(previousOut); System.setErr(previousErr);
+-                }
++                var values = task.get(2).getAsJsonArray();
++                var argv = new String[values.size()];
++                for (int i = 0; i < argv.length; i++) argv[i] = values.get(i).getAsString();
++                String error = task(task.get(0).getAsString(), task.get(1).getAsString(), argv, reset);
+                 replies.println(new Gson().toJson(error));
+                 if (!error.isEmpty()) System.exit(1);
+             }
+@@ -66,4 +47,35 @@ public final class PrepareWorker {
+         // Vanilla may have started non-daemon executors. All task outputs are closed now.
+         System.exit(0);
+     }
++
++    /** Bootstraps vanilla on this classpath, as a worker starts; also called in a launcher's own JVM
++     *  (AMADORA on iOS, which starts no processes). Returns what restores the tags after a task. */
++    public static Runnable init() {
++        net.minecraft.SharedConstants.tryDetectVersion();
++        net.minecraft.server.Bootstrap.bootStrap();
++        var resets = new ArrayList<Runnable>();
++        for (var registry : BuiltInRegistries.REGISTRY) resets.add(restoreTags(registry));
++        System.setProperty("horizon.prepare.reuse", "true");
++        return () -> resets.forEach(Runnable::run);
++    }
++
++    /** Runs one exporter's main with its output appended to {@code log}: "" when it worked, else the failure. */
++    public static String task(String log, String main, String[] argv, Runnable reset) throws IOException {
++        var previousOut = System.out; var previousErr = System.err;
++        String error = "";
++        try (var out = new PrintStream(Files.newOutputStream(Path.of(log),
++                StandardOpenOption.CREATE, StandardOpenOption.APPEND), true, StandardCharsets.UTF_8)) {
++            System.setOut(out); System.setErr(out);
++            try {
++                Class.forName("dev.horizonlab.parity." + main).getMethod("main", String[].class).invoke(null, (Object) argv);
++            } catch (Throwable failure) {
++                failure.printStackTrace(out); error = failure.toString();
++            } finally {
++                reset.run();
++            }
++        } finally {
++            System.setOut(previousOut); System.setErr(previousErr);
++        }
++        return error;
++    }
+ }
