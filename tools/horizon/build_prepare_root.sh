@@ -41,4 +41,7 @@ rsync -a --include='*/' --include='*.java' --exclude='*' mods/horizon/src/test/j
   "$out/mods/horizon/src/test/java/dev/horizonlab/parity/"
 cp crates/horizon-prepare/src/exporters.rs "$out/crates/horizon-prepare/src/"
 cp research-lock.json LICENSE "$out/"
+# Zipped: a .class file starts with CAFEBABE, the fat Mach-O magic, and loose ones crash on-device
+# signers such as LiveContainer's. HorizonSetup.m unpacks it.
+(cd "$out" && zip -qrX exporters.zip exporters && rm -rf exporters)
 echo "Horizon's prepare files: $(du -sh "$out" | cut -f1) in $out"

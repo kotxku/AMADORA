@@ -106,6 +106,9 @@ jobs:
             *AngelAuraAmethyst.app/horizon-prepare/research-lock.json*) ;;
             *) echo "::error::the IPA has no horizon-prepare/research-lock.json"; exit 1 ;;
           esac
+          # Loose .class files (CAFEBABE, like a fat Mach-O) crash LiveContainer's signer
+          classes=$(grep -c '\.class$' <<< "$listing" || true)
+          [ "$classes" = 0 ] || { echo "::error::the IPA has $classes loose .class files"; exit 1; }
 
       - name: Name IPA
         run: mv artifacts/org.angelauramc.amethyst-*-ios.ipa artifacts/AMADORA_V0.3.ipa
