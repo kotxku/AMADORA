@@ -243,7 +243,7 @@ static NSString *engineLibraryPath(void) {
 // Lets go of every key and button: the game changed between play and a menu
 - (void)releaseAll {
     for (HorizonControlButton *b in self.buttons) [b releaseIfHeld];
-    [self setPadKeys:[NSSet set]];
+    [self pressPadKeys:[NSSet set]];
     if (self.mining) {
         h_mouse_button(0, false);
         self.mining = NO;
@@ -268,7 +268,7 @@ static NSString *engineLibraryPath(void) {
 
 #pragma mark Movement pad
 
-- (void)setPadKeys:(NSSet<NSNumber *> *)keys {
+- (void)pressPadKeys:(NSSet<NSNumber *> *)keys {
     for (NSNumber *k in self.padKeys.copy) {
         if (![keys containsObject:k]) {
             h_key(k.unsignedIntValue, false);
@@ -296,7 +296,7 @@ static NSString *engineLibraryPath(void) {
         if (ux < -0.38) [keys addObject:@(kHidA)];
         if (ux > 0.38) [keys addObject:@(kHidD)];
     }
-    [self setPadKeys:keys];
+    [self pressPadKeys:keys];
 }
 
 #pragma mark Touches
@@ -360,7 +360,7 @@ static NSString *engineLibraryPath(void) {
             self.pointerTouch = nil;
         } else if (touch == self.padTouch) {
             self.padTouch = nil;
-            [self setPadKeys:[NSSet set]];
+            [self pressPadKeys:[NSSet set]];
             [self setNeedsLayout];
         } else if (touch == self.lookTouch) {
             [self.mineTimer invalidate];
