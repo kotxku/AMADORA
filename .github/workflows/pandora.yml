@@ -73,6 +73,27 @@ jobs:
       - name: Use Mesa for iOS
         run: cp Natives/build/mesa/*.dylib Natives/build/
 
+      # Horizon (Minecraft 26.3 rewritten in Rust) as libhorizon_ios.dylib; HorizonGame.m loads it from Frameworks.
+      # tools/horizon/horizon-ios.patch is made on this commit.
+      - name: Cache Horizon build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ runner.temp }}/horizon/target
+          key: horizon-86a60b1b-${{ hashFiles('tools/horizon/**') }}
+          restore-keys: horizon-86a60b1b-
+
+      - name: Build Horizon for iOS
+        run: |
+          mkdir -p "$RUNNER_TEMP/horizon" && cd "$RUNNER_TEMP/horizon"
+          git init -q . && git remote add origin https://github.com/horizon-rust/horizon.git
+          git fetch -q --depth 1 origin 86a60b1b9670abba865e079b12d6f978c73d8cba
+          git checkout -q FETCH_HEAD
+          cd "$GITHUB_WORKSPACE"
+          bash tools/horizon/build_horizon_ios.sh "$RUNNER_TEMP/horizon" Natives/build/libhorizon_ios.dylib
+
       - name: Build IPA
         run: |
           export PATH="$(brew --prefix)/bin:$PATH"

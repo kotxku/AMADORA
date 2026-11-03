@@ -136,6 +136,9 @@ add_executable(AngelAuraAmethyst
   installer/modpack/CurseForgeAPI.m
   installer/modpack/ModrinthAPI.m
 
+  horizon/HorizonGame.m
+  horizon/HorizonViewController.m
+
   input/ControllerInput.m
   input/GyroInput.m
   input/KeyboardInput.m

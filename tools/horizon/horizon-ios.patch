@@ -1,0 +1,442 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index f25b0a7..8988eb2 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -1557,6 +1557,15 @@ dependencies = [
+  "wgpu",
+ ]
+ 
++[[package]]
++name = "horizon-ios"
++version = "0.1.0"
++dependencies = [
++ "horizon-client",
++ "horizon-threads",
++ "winit",
++]
++
+ [[package]]
+ name = "horizon-items"
+ version = "0.1.0"
+@@ -4978,8 +4987,6 @@ checksum = "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
+ [[package]]
+ name = "winit"
+ version = "0.30.13"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "a6755fa58a9f8350bd1e472d4c3fcc25f824ec358933bba33306d0b63df5978d"
+ dependencies = [
+  "ahash",
+  "android-activity",
+diff --git a/Cargo.toml b/Cargo.toml
+index 5b0c2e4..98bd5be 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -37,6 +37,7 @@ members = [
+     "crates/horizon-optifine",
+     "crates/horizon-shader-api",
+     "crates/horizon-release-sign",
++    "crates/horizon-ios",
+     "xtask",
+ ]
+ resolver = "2"
+@@ -72,6 +73,9 @@ naga = { path = "third_party/naga" }
+ # game died before main on CPUs without it (Core 2, #7264; THIRD_PARTY_NOTICES.md). Drop this and
+ # the folder once a libmimalloc-sys release has microsoft/mimalloc#1291's fix.
+ libmimalloc-sys = { path = "third_party/libmimalloc-sys" }
++# Amadora: winit 0.30.13 whose iOS event loop joins an app that is already running and takes
++# input from the app's touch controls, keyboard and mouse (tools/horizon/patch_winit.py).
++winit = { path = "third_party/winit" }
+ 
+ # Line tables keep file:line in backtraces; full debug info made every
+ # example and test binary hundreds of megabytes and slow to link.
+diff --git a/crates/horizon-client-input/Cargo.toml b/crates/horizon-client-input/Cargo.toml
+index e1d7cf7..157c633 100644
+--- a/crates/horizon-client-input/Cargo.toml
++++ b/crates/horizon-client-input/Cargo.toml
+@@ -1,23 +1,25 @@
+-[package]
+-name = "horizon-client-input"
+-version = "0.1.0"
+-edition.workspace = true
+-license.workspace = true
+-rust-version = "1.90"
+-description = "The client's input layer: key bindings and their names, mouse, controllers, clipboard and window options"
+-
+-[dependencies]
+-horizon-client-core = { path = "../horizon-client-core" }
+-winit = "0.30.13"
+-# The window icon.
+-horizon-theme = { path = "../horizon-theme" }
+-png = "0.18"
+-arboard = { version = "3.6.1", default-features = false, features = ["wayland-data-control"] }
+-# The DualSense's trigger effects (the `controllers` feature).
+-horizon-dualsense = { path = "../horizon-dualsense", optional = true }
+-
+-[features]
+-controllers = ["dep:horizon-dualsense"]
+-
+-[lints]
+-workspace = true
++[package]
++name = "horizon-client-input"
++version = "0.1.0"
++edition.workspace = true
++license.workspace = true
++rust-version = "1.90"
++description = "The client's input layer: key bindings and their names, mouse, controllers, clipboard and window options"
++
++[dependencies]
++horizon-client-core = { path = "../horizon-client-core" }
++winit = "0.30.13"
++# The window icon.
++horizon-theme = { path = "../horizon-theme" }
++png = "0.18"
++# The DualSense's trigger effects (the `controllers` feature).
++horizon-dualsense = { path = "../horizon-dualsense", optional = true }
++
++[target.'cfg(not(target_os = "ios"))'.dependencies]
++arboard = { version = "3.6.1", default-features = false, features = ["wayland-data-control"] }
++
++[features]
++controllers = ["dep:horizon-dualsense"]
++
++[lints]
++workspace = true
+diff --git a/crates/horizon-client-input/src/clipboard.rs b/crates/horizon-client-input/src/clipboard.rs
+index eaf2a22..4b01b95 100644
+--- a/crates/horizon-client-input/src/clipboard.rs
++++ b/crates/horizon-client-input/src/clipboard.rs
+@@ -111,6 +111,27 @@ pub fn helper_clipboard_contents(clipboard: &str) -> String {
+     strip_formatting(&clipboard.replace('\r', ""))
+ }
+ 
++/// iOS: no arboard backend; text copied in the game can still be pasted in the game.
++#[cfg(target_os = "ios")]
++mod arboard {
++    pub enum Error {
++        ContentNotAvailable,
++        Unavailable,
++    }
++    pub struct Clipboard;
++    impl Clipboard {
++        pub fn new() -> Result<Self, Error> {
++            Err(Error::Unavailable)
++        }
++        pub fn get_text(&mut self) -> Result<String, Error> {
++            Err(Error::ContentNotAvailable)
++        }
++        pub fn set_text(&mut self, _text: String) -> Result<(), Error> {
++            Ok(())
++        }
++    }
++}
++
+ /// A clipboard: the system's, or an in-memory one in tests.
+ pub trait Clipboard {
+     /// `KeyboardHandler.getClipboard`: empty when there is no text.
+diff --git a/crates/horizon-client-input/src/keybinds.rs b/crates/horizon-client-input/src/keybinds.rs
+index 439df2a..fd331d0 100644
+--- a/crates/horizon-client-input/src/keybinds.rs
++++ b/crates/horizon-client-input/src/keybinds.rs
+@@ -289,6 +289,7 @@ pub use horizon_client_core::key_display::display_name;
+ /// Q key shows A.
+ pub fn learn_layout(event: &winit::event::KeyEvent) {
+     use winit::keyboard::{Key, PhysicalKey};
++    #[cfg(not(target_os = "ios"))]
+     use winit::platform::modifier_supplement::KeyEventExtModifierSupplement;
+     let PhysicalKey::Code(code) = event.physical_key else {
+         return;
+@@ -297,7 +298,12 @@ pub fn learn_layout(event: &winit::event::KeyEvent) {
+         return;
+     };
+     let learn = horizon_client_core::key_display::learn_layout;
+-    match event.key_without_modifiers() {
++    // iOS: winit has no key_without_modifiers there; the logical key is close enough.
++    #[cfg(target_os = "ios")]
++    let key = event.logical_key.clone();
++    #[cfg(not(target_os = "ios"))]
++    let key = event.key_without_modifiers();
++    match key {
+         Key::Character(text) => learn(name, &text),
+         Key::Dead(Some(c)) => learn(name, c.encode_utf8(&mut [0; 4])),
+         _ => {}
+diff --git a/crates/horizon-client-lib/Cargo.toml b/crates/horizon-client-lib/Cargo.toml
+index c51a856..44c9ec0 100644
+--- a/crates/horizon-client-lib/Cargo.toml
++++ b/crates/horizon-client-lib/Cargo.toml
+@@ -98,7 +98,7 @@ objc2 = "0.6"
+ objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSWindow", "NSScreen"] }
+ objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSString"] }
+ 
+-[target.'cfg(not(target_os = "macos"))'.dependencies]
++[target.'cfg(not(target_vendor = "apple"))'.dependencies]
+ # OpenGL (WGL on Windows, EGL on Linux), the last fallback, for GPUs with no Vulkan or
+ # DirectX 12 driver (`graphicsApi`, graphics.rs).
+ wgpu = { version = "30.0.1", default-features = false, features = ["gles"] }
+diff --git a/crates/horizon-client-render/Cargo.toml b/crates/horizon-client-render/Cargo.toml
+index 4359dd8..d15f703 100644
+--- a/crates/horizon-client-render/Cargo.toml
++++ b/crates/horizon-client-render/Cargo.toml
+@@ -66,7 +66,7 @@ rustix = { version = "1", default-features = false, features = ["std", "time"] }
+ [target.'cfg(windows)'.dependencies]
+ wgpu = { version = "30.0.1", default-features = false, features = ["dx12"] }
+ 
+-[target.'cfg(not(target_os = "macos"))'.dependencies]
++[target.'cfg(not(target_vendor = "apple"))'.dependencies]
+ wgpu = { version = "30.0.1", default-features = false, features = ["gles"] }
+ 
+ [features]
+diff --git a/crates/horizon-client-render/src/gfx.rs b/crates/horizon-client-render/src/gfx.rs
+index d668e6b..43a16c5 100644
+--- a/crates/horizon-client-render/src/gfx.rs
++++ b/crates/horizon-client-render/src/gfx.rs
+@@ -1561,7 +1561,7 @@ impl wgpu::rwh::HasDisplayHandle for WindowDisplay {
+ /// the renderer's start (#746). macOS has Metal only.
+ fn backend_order(api: GraphicsApi, os: &str, wgpu_backend: bool) -> Vec<wgpu::Backends> {
+     use wgpu::Backends;
+-    if os == "macos" || wgpu_backend {
++    if os == "macos" || os == "ios" || wgpu_backend {
+         return vec![Backends::default()];
+     }
+     let windows = os == "windows";
+@@ -1873,12 +1873,12 @@ async fn open_backend(
+         memory_hints: wgpu::MemoryHints::MemoryUsage,
+         ..Default::default()
+     };
+-    #[cfg(not(target_os = "macos"))]
++    #[cfg(not(target_vendor = "apple"))]
+     let opened = match info.backend {
+         wgpu::Backend::Vulkan => horizon_hdr::open_vulkan_device(&adapter, &desc),
+         _ => None,
+     };
+-    #[cfg(target_os = "macos")]
++    #[cfg(target_vendor = "apple")]
+     let opened = None;
+     let opened = match opened {
+         Some(opened) => opened,
+diff --git a/crates/horizon-client/Cargo.toml b/crates/horizon-client/Cargo.toml
+index 33f3d5f..adc62ea 100644
+--- a/crates/horizon-client/Cargo.toml
++++ b/crates/horizon-client/Cargo.toml
+@@ -97,7 +97,7 @@ objc2 = "0.6"
+ objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSWindow", "NSScreen"] }
+ objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSString"] }
+ 
+-[target.'cfg(not(target_os = "macos"))'.dependencies]
++[target.'cfg(not(target_vendor = "apple"))'.dependencies]
+ # OpenGL (WGL on Windows, EGL on Linux), the last fallback, for GPUs with no Vulkan or
+ # DirectX 12 driver (`graphicsApi`, graphics.rs).
+ wgpu = { version = "30.0.1", default-features = false, features = ["gles"] }
+diff --git a/crates/horizon-client/src/entry.rs b/crates/horizon-client/src/entry.rs
+index b37fc9f..0e948be 100644
+--- a/crates/horizon-client/src/entry.rs
++++ b/crates/horizon-client/src/entry.rs
+@@ -6,6 +6,22 @@ pub fn main() {
+     main_with(Default::default());
+ }
+ 
++/// The game's command line when a host app starts it in its own process (iOS), where
++/// `std::env::args` is the app's.
++static ARGS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
++
++/// Sets the command line `main` reads instead of the process's (without the program name).
++pub fn set_args(args: Vec<String>) {
++    let _ = ARGS.set(args);
++}
++
++/// The command line without the program name: `set_args`'s, else the process's.
++pub fn args() -> Vec<String> {
++    ARGS.get()
++        .cloned()
++        .unwrap_or_else(|| std::env::args().skip(1).collect())
++}
++
+ /// Start the game with trait mods in dispatch order.
+ pub fn main_with(mods: crate::mod_api::Mods) {
+     // First: a trait injection into anything below (logging, the crash handler) calls its mod.
+@@ -15,7 +31,7 @@ pub fn main_with(mods: crate::mod_api::Mods) {
+     horizon_threads::configure_allocator();
+     horizon_client::telemetry::mark_start();
+     horizon_client::spans::startup::init(std::time::Instant::now());
+-    let args: Vec<String> = std::env::args().skip(1).collect();
++    let args: Vec<String> = args();
+     let game_args = args.iter().take_while(|a| *a != "--dedicated");
+     let help = game_args
+         .clone()
+diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
+index 70e277c..1a79971 100644
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -536,7 +536,7 @@ impl Options {
+     /// The command line, then what it asks of the process: the game folder, the account.
+     /// A bad command line is a [`launch_api::UsageError`] (exit code 2, no crash report).
+     fn read() -> Result<Option<Self>> {
+-        let Some(mut o) = Self::parse(std::env::args().skip(1))
++        let Some(mut o) = Self::parse(crate::entry::args().into_iter())
+             .map_err(|e| launch_api::UsageError(e.to_string()))?
+         else {
+             return Ok(None);
+diff --git a/crates/horizon-hdr/Cargo.toml b/crates/horizon-hdr/Cargo.toml
+index 297c758..d5f0999 100644
+--- a/crates/horizon-hdr/Cargo.toml
++++ b/crates/horizon-hdr/Cargo.toml
+@@ -9,7 +9,7 @@ description = "HDR metadata for the swapchain: the Vulkan calls the crates that
+ [dependencies]
+ wgpu = { version = "30.0.1", default-features = false, features = ["vulkan"] }
+ 
+-[target.'cfg(not(target_os = "macos"))'.dependencies]
++[target.'cfg(not(target_vendor = "apple"))'.dependencies]
+ # The version wgpu-hal already uses.
+ ash = { version = "0.38", default-features = false }
+ 
+diff --git a/crates/horizon-hdr/src/lib.rs b/crates/horizon-hdr/src/lib.rs
+index 4f7d737..0c33892 100644
+--- a/crates/horizon-hdr/src/lib.rs
++++ b/crates/horizon-hdr/src/lib.rs
+@@ -9,7 +9,7 @@ pub mod wayland;
+ /// Opens a Vulkan device with `VK_EXT_hdr_metadata` too, when the GPU offers
+ /// it, so [`set_metadata`] can tell the compositor the real peak brightness.
+ /// `None` leaves opening to wgpu.
+-#[cfg(not(target_os = "macos"))]
++#[cfg(not(target_vendor = "apple"))]
+ pub fn open_vulkan_device(
+     adapter: &wgpu::Adapter,
+     desc: &wgpu::DeviceDescriptor<'_>,
+@@ -57,7 +57,7 @@ pub fn set_metadata(
+     peak: f32,
+     black: f32,
+ ) {
+-    #[cfg(not(target_os = "macos"))]
++    #[cfg(not(target_vendor = "apple"))]
+     {
+         use wgpu::hal::api::Vulkan;
+         // Safety: read-only access to handles wgpu keeps alive while these guards live.
+diff --git a/crates/horizon-ios/Cargo.toml b/crates/horizon-ios/Cargo.toml
+new file mode 100644
+index 0000000..4dcbd8f
+--- /dev/null
++++ b/crates/horizon-ios/Cargo.toml
+@@ -0,0 +1,18 @@
++[package]
++name = "horizon-ios"
++version = "0.1.0"
++edition.workspace = true
++license.workspace = true
++rust-version = "1.90"
++description = "Horizon as a library an iOS app loads and starts (Amadora)"
++
++[lib]
++crate-type = ["cdylib"]
++
++[dependencies]
++horizon-client = { path = "../horizon-client" }
++horizon-threads = { path = "../horizon-threads" }
++
++[target.'cfg(target_os = "ios")'.dependencies]
++# The patched winit (tools/horizon/patch_winit.py): its input bridge.
++winit = "0.30.13"
+diff --git a/crates/horizon-ios/src/lib.rs b/crates/horizon-ios/src/lib.rs
+new file mode 100644
+index 0000000..7bd19fa
+--- /dev/null
++++ b/crates/horizon-ios/src/lib.rs
+@@ -0,0 +1,77 @@
++//! Horizon in an iOS app's process: the app loads this library and calls
++//! `horizon_ios_main` on its main thread, which never returns while the game runs.
++
++use std::ffi::{CStr, c_char, c_int};
++
++#[global_allocator]
++static ALLOCATOR: horizon_threads::Allocator = horizon_threads::ALLOCATOR;
++
++/// Starts the game with `argv[0..argc]` as its command line (no program name).
++/// Must be called on the main thread of a running UIKit app.
++///
++/// # Safety
++/// `argv` holds `argc` valid NUL-terminated strings.
++#[unsafe(no_mangle)]
++pub unsafe extern "C" fn horizon_ios_main(argc: c_int, argv: *const *const c_char) -> c_int {
++    let args = (0..argc.max(0) as usize)
++        // SAFETY: the caller passes `argc` valid C strings.
++        .map(|i| unsafe { CStr::from_ptr(*argv.add(i)) }.to_string_lossy().into_owned())
++        .collect();
++    horizon_client::entry::set_args(args);
++    horizon_client::entry::main();
++    0
++}
++
++/// Input from the app's touch controls, keyboard and mouse (winit has none on iOS).
++#[cfg(target_os = "ios")]
++mod input {
++    use std::ffi::{CStr, c_char};
++    use winit::platform::ios::amadora;
++
++    /// A key by its USB HID usage (UIKeyboardHIDUsage).
++    #[unsafe(no_mangle)]
++    pub extern "C" fn horizon_ios_key(hid: u32, pressed: bool) {
++        amadora::key(hid, pressed);
++    }
++    /// Text from the on-screen keyboard.
++    ///
++    /// # Safety
++    /// `text` is a valid NUL-terminated UTF-8 string.
++    #[unsafe(no_mangle)]
++    pub unsafe extern "C" fn horizon_ios_text(text: *const c_char) {
++        if !text.is_null() {
++            // SAFETY: the caller passes a valid C string.
++            amadora::text(&unsafe { CStr::from_ptr(text) }.to_string_lossy());
++        }
++    }
++    /// A mouse button: 0 left, 1 right, 2 middle.
++    #[unsafe(no_mangle)]
++    pub extern "C" fn horizon_ios_mouse_button(button: u32, pressed: bool) {
++        amadora::mouse_button(button, pressed);
++    }
++    /// The pointer at (`x`, `y`) in physical pixels.
++    #[unsafe(no_mangle)]
++    pub extern "C" fn horizon_ios_cursor(x: f64, y: f64) {
++        amadora::cursor(x, y);
++    }
++    /// Camera movement while the pointer is grabbed.
++    #[unsafe(no_mangle)]
++    pub extern "C" fn horizon_ios_mouse_motion(dx: f64, dy: f64) {
++        amadora::mouse_motion(dx, dy);
++    }
++    /// The wheel, in lines.
++    #[unsafe(no_mangle)]
++    pub extern "C" fn horizon_ios_scroll(dx: f64, dy: f64) {
++        amadora::scroll(dx, dy);
++    }
++    /// Whether the game holds the pointer (playing rather than in a menu).
++    #[unsafe(no_mangle)]
++    pub extern "C" fn horizon_ios_cursor_grabbed() -> bool {
++        amadora::cursor_grabbed()
++    }
++    /// Whether the game has opened its window.
++    #[unsafe(no_mangle)]
++    pub extern "C" fn horizon_ios_has_window() -> bool {
++        amadora::has_window()
++    }
++}
+diff --git a/crates/horizon-threads/src/memory_limit.rs b/crates/horizon-threads/src/memory_limit.rs
+index 41ecb4d..25371a5 100644
+--- a/crates/horizon-threads/src/memory_limit.rs
++++ b/crates/horizon-threads/src/memory_limit.rs
+@@ -338,7 +338,7 @@ pub fn resident_bytes() -> Option<u64> {
+ }
+ 
+ /// The memory this process holds in RAM, in bytes.
+-#[cfg(target_vendor = "apple")]
++#[cfg(target_os = "macos")]
+ pub fn resident_bytes() -> Option<u64> {
+     let size = std::mem::size_of::<libc::proc_taskinfo>() as libc::c_int;
+     // SAFETY: all-zero is a valid value of this plain C struct, and the call writes at most `size`
+@@ -361,7 +361,7 @@ pub fn resident_bytes() -> Option<u64> {
+     windows,
+     target_os = "linux",
+     target_os = "android",
+-    target_vendor = "apple"
++    target_os = "macos"
+ )))]
+ pub fn resident_bytes() -> Option<u64> {
+     None
