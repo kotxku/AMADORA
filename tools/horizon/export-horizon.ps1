@@ -1,4 +1,4 @@
-# Zips Horizon's prepared Minecraft 26.3 game files for AMADORA (Library > Horizon > Import from a zip).
+# Zips Horizon's prepared Minecraft 26.3 game files for AMADORA (sidebar > Horizon > Import from a zip).
 # Run it on the computer where the Horizon launcher (playhorizon.dev) has prepared 26.3: install the
 # launcher, sign in with the Microsoft account that owns Java Edition, and press Play once.
 #   powershell -ExecutionPolicy Bypass -File export-horizon.ps1
@@ -62,4 +62,4 @@ Write-Host "Made $zip ($size)." -ForegroundColor Green
 if (-not $sounds) {
     Write-Host 'These files have no sounds, so Horizon will be silent. The Horizon launcher copies them from your Minecraft install when it prepares.' -ForegroundColor Yellow
 }
-Write-Host 'Put the zip on your iPhone (iCloud Drive, AirDrop or a share), then in AMADORA: Library > Horizon > Import from a zip.'
+Write-Host 'Put the zip on your iPhone (iCloud Drive, AirDrop or a share), then in AMADORA: tap the sidebar button (top left) > Horizon > Import from a zip.'
