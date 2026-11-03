@@ -1,4 +1,4 @@
-# Zips a Horizon modpack port for AMADORA (Library > Horizon > Import a Horizon modpack).
+# Zips a Horizon modpack port for AMADORA (sidebar > Horizon > Import a Horizon modpack).
 # A port's content mods are folders with horizon-mod.toml (the Horizon launcher's
 # `modpack port` writes them as mods\<id>\carry); Horizon on PC loads them with --dev-mod, and so
 # does AMADORA. Shader and resource pack zips and horizon-graphics.txt come from the port's game folder.
@@ -69,4 +69,4 @@ try {
 }
 
 Write-Host ("Made {0} ({1:N0} MB) with {2} content mods." -f $Out, ((Get-Item -LiteralPath $Out).Length / 1MB), $modDirs.Count) -ForegroundColor Green
-Write-Host 'Put the zip on your iPhone (iCloud Drive, AirDrop or a share), then in AMADORA: Library > Horizon > Import a Horizon modpack.'
+Write-Host 'Put the zip on your iPhone (iCloud Drive, AirDrop or a share), then in AMADORA: tap the sidebar button (top left) > Horizon > Import a Horizon modpack.'

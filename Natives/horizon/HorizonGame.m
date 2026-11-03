@@ -721,7 +721,7 @@ static void watchGameWindow(void) {
 
 + (NSString *)startProblem {
     if (!self.engineAvailable) return @"This build of AMADORA doesn't include the Horizon engine.";
-    if (!self.resourcesReady) return @"Horizon's 26.3 game files aren't on this device yet. Open Library > Horizon to set them up on this device or import a zip from a PC, then press Play.";
+    if (!self.resourcesReady) return @"Horizon's 26.3 game files aren't on this device yet. Open the Horizon page (the sidebar button at the top left, then Horizon) to set them up or import a zip from a PC, then press Play.";
     return nil;
 }
 

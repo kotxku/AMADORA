@@ -17,6 +17,8 @@
 @property(nonatomic) BOOL isInitialVc;
 
 - (void)restoreHighlightedSelection;
+// Shows the Horizon page, as tapping Horizon in the sidebar does
+- (void)openHorizon;
 - (void)selectAccount:(UIButton *)sender;
 - (void)updateAccountInfo;
 - (UIBarButtonItem *)drawAccountButton;

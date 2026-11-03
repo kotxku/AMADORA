@@ -324,6 +324,14 @@ typedef NS_ENUM(NSInteger, LauncherMenuSection) {
     }
 }
 
+- (void)openHorizon {
+    NSIndexPath *path = [NSIndexPath indexPathForRow:1 inSection:kMenuLibrary];
+    if (![self.lastSelected isEqual:path]) {
+        [self tableView:self.tableView didSelectRowAtIndexPath:path];
+    }
+    [contentNavigationController popToRootViewControllerAnimated:NO];
+}
+
 - (void)selectAccount:(UIButton *)sender {
     AccountListViewController *vc = [[AccountListViewController alloc] init];
     vc.whenDelete = ^void(NSString* name) {

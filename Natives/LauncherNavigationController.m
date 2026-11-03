@@ -302,14 +302,21 @@
 
     NSString *versionId = PLProfiles.current.profiles[self.versionTextField.text][@"lastVersionId"];
     if ([HorizonGame isHorizonVersion:versionId]) {
-        // First Play with no game files: set them up from here, no trip to Library
+        // First Play with no game files: set them up from here, no trip to the Horizon page
         if (HorizonGame.engineAvailable && !HorizonGame.resourcesReady && HorizonSetup.available) {
             [self confirmHorizonSetUp];
             return;
         }
         NSString *problem = HorizonGame.startProblem;
         if (problem) {
-            showDialog(@"Can't start Horizon", problem);
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Can't start Horizon" message:problem preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
+            if (HorizonGame.engineAvailable) {
+                [alert addAction:[UIAlertAction actionWithTitle:@"Open Horizon" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+                    [sidebarViewController openHorizon];
+                }]];
+            }
+            [self presentViewController:alert animated:YES completion:nil];
             return;
         }
         // JIT first, the way a Java launch asks for it (StikDebug, SideStore, TrollStore, or
@@ -338,7 +345,7 @@
 }
 
 // Horizon can't ship Mojang's 26.3 files, so the first Play fetches 26.3 from Mojang and builds
-// them here, the way Library > Horizon > Set up on this device does
+// them here, the way the Horizon page's Set up on this device does
 - (void)confirmHorizonSetUp {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Set up Horizon"
         message:@"Horizon needs its 26.3 game files once. AMADORA downloads Minecraft 26.3 from Mojang (about 700 MB, use Wi-Fi), then builds them with JIT on, which takes several minutes. AMADORA closes when it's done: open it again and press Play."
