@@ -6,7 +6,7 @@
 # Usage: build_prepare_root.sh <patched Horizon checkout> <output folder>
 set -euo pipefail
 src=$(cd "$1" && pwd)
-out=$2
+mkdir -p "$2" && out=$(cd "$2" && pwd) # absolute: the steps below run inside the checkout
 tools=$(cd "$(dirname "$0")" && pwd)
 work="${RUNNER_TEMP:-/tmp}/horizon-prepare-work"
 mkdir -p "$work"

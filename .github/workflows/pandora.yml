@@ -100,6 +100,12 @@ jobs:
         run: |
           export PATH="$(brew --prefix)/bin:$PATH"
           gmake -j$(sysctl -n hw.ncpu) package BOOTJDK="$JAVA_HOME/bin" RELEASE=1
+          # On-device Horizon setup needs these; fail here rather than ship a build that can't set up
+          listing=$(unzip -l artifacts/org.angelauramc.amethyst-*-ios.ipa)
+          case "$listing" in
+            *AngelAuraAmethyst.app/horizon-prepare/research-lock.json*) ;;
+            *) echo "::error::the IPA has no horizon-prepare/research-lock.json"; exit 1 ;;
+          esac
 
       - name: Name IPA
         run: mv artifacts/org.angelauramc.amethyst-*-ios.ipa artifacts/AMADORA_V0.3.ipa
