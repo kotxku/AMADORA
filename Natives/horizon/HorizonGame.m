@@ -719,10 +719,15 @@ static void watchGameWindow(void) {
     [NSRunLoop.mainRunLoop addTimer:timer forMode:NSRunLoopCommonModes];
 }
 
-+ (NSString *)startInGameDir:(NSString *)gameDir {
-    NSString *message;
++ (NSString *)startProblem {
     if (!self.engineAvailable) return @"This build of AMADORA doesn't include the Horizon engine.";
     if (!self.resourcesReady) return @"Horizon's 26.3 game files aren't on this device yet. Open Library > Horizon and tap Set up on this device (or import a zip from a PC), then press Play.";
+    return nil;
+}
+
++ (NSString *)startInGameDir:(NSString *)gameDir {
+    NSString *message = self.startProblem;
+    if (message) return message;
     if (!loadEngine(&message)) return message;
 
     // The instance's folder is the game's: saves, options, logs and packs
