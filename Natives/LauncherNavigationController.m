@@ -301,9 +301,18 @@
 
     NSString *versionId = PLProfiles.current.profiles[self.versionTextField.text][@"lastVersionId"];
     if ([HorizonGame isHorizonVersion:versionId]) {
-        // Started from the run loop, not inside this tap's handling: the game keeps the main run
-        // loop turning itself and doesn't return
-        [self performSelector:@selector(launchHorizon:) withObject:self.versionTextField.text afterDelay:0];
+        NSString *problem = HorizonGame.startProblem;
+        if (problem) {
+            showDialog(@"Can't start Horizon", problem);
+            return;
+        }
+        // JIT first, the way a Java launch asks for it (StikDebug, SideStore, TrollStore, or
+        // LiveContainer's JIT setting). Then started from the run loop, not inside this tap's
+        // handling: the game keeps the main run loop turning itself and doesn't return
+        NSString *name = self.versionTextField.text;
+        [self invokeAfterJITEnabled:^{
+            [self performSelector:@selector(launchHorizon:) withObject:name afterDelay:0];
+        }];
         return;
     }
     NSDictionary *object = [remoteVersionList filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"(id == %@)", versionId]].firstObject;
