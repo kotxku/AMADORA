@@ -36,7 +36,7 @@ static id typed(id obj, Class cls) {
     NSURLComponents *components = [NSURLComponents componentsWithString:url];
     components.queryItems = query.count ? query : nil;
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:components.URL];
-    [request setValue:@"kotxku/AMADORA-V0.2" forHTTPHeaderField:@"User-Agent"];
+    [request setValue:@"kotxku/AMADORA" forHTTPHeaderField:@"User-Agent"];
     if (source == PLContentSourceCurseForge) {
         [request setValue:self.curseForgeAPIKey forHTTPHeaderField:@"x-api-key"];
     }

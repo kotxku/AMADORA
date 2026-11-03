@@ -13,7 +13,7 @@ static id typed(id obj, Class cls) {
 + (NSMutableURLRequest *)requestFor:(NSString *)url {
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]];
     // Modrinth asks clients to identify themselves
-    [request setValue:@"kotxku/AMADORA-V0.2" forHTTPHeaderField:@"User-Agent"];
+    [request setValue:@"kotxku/AMADORA" forHTTPHeaderField:@"User-Agent"];
     return request;
 }
 
