@@ -2,6 +2,7 @@
 #import "AccountListViewController.h"
 #import "AFNetworking.h"
 #import "ContentBrowserViewController.h"
+#import "horizon/HorizonViewController.h"
 #import "InstanceViewController.h"
 #import "PLTheme.h"
 #import "SyncingViewController.h"
@@ -82,7 +83,7 @@ typedef NS_ENUM(NSInteger, LauncherMenuSection) {
         [LauncherMenuCustomItem vcClass:LauncherPreferencesViewController.class],
     ].mutableCopy;
     self.sections = @[
-        @[instances, [LauncherMenuCustomItem vcClass:SyncingViewController.class]].mutableCopy,
+        @[instances, [LauncherMenuCustomItem vcClass:HorizonViewController.class], [LauncherMenuCustomItem vcClass:SyncingViewController.class]].mutableCopy,
         @[[LauncherMenuCustomItem viewController:[[ContentBrowserViewController alloc] initWithSource:PLContentSourceModrinth targetProfileName:nil]],
           [LauncherMenuCustomItem viewController:[[ContentBrowserViewController alloc] initWithSource:PLContentSourceCurseForge targetProfileName:nil]]].mutableCopy,
         [NSMutableArray new],
