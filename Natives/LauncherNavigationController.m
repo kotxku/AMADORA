@@ -484,7 +484,7 @@
         version, version, canLoadUnsignedLibraries() ? @"\n\nOr import one in Settings > Manage Runtimes." : @""];
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:[NSString stringWithFormat:@"This pack needs Java %d", version] message:message preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Install" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        openLink(self, [NSURL URLWithString:@"https://github.com/kotxku/AMADORA-V0.2/releases"]);
+        openLink(self, [NSURL URLWithString:@"https://github.com/kotxku/AMADORA/releases"]);
     }]];
     [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];

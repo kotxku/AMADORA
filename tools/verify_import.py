@@ -5,7 +5,7 @@ Keep in sync with Natives/installer/PandoraImport.m and ModDoctor.m.
 """
 import concurrent.futures, hashlib, io, json, os, re, sys, urllib.parse, urllib.request, zipfile
 
-UA = {'User-Agent': 'kotxku/AMADORA-V0.2'}
+UA = {'User-Agent': 'kotxku/AMADORA'}
 BUNDLED_JAVA = {8, 17, 21, 25}
 BUILTIN = {'minecraft', 'java', 'fabricloader', 'fabric-loader', 'quilt_loader', 'forge', 'neoforge'}
 
