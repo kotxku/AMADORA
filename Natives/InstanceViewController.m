@@ -32,7 +32,7 @@
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
     self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
     self.selectionStyle = UITableViewCellSelectionStyleNone;
-    self.backgroundColor = PLTheme.background;
+    self.backgroundColor = UIColor.clearColor;
 
     self.toggle = [UISwitch new];
     [self.toggle addTarget:self action:@selector(toggled) forControlEvents:UIControlEventValueChanged];
