@@ -7,6 +7,7 @@
 #import "DownloadProgressViewController.h"
 #import "installer/ModDoctor.h"
 #import "horizon/HorizonGame.h"
+#import "horizon/HorizonSetup.h"
 #import "JavaGUIViewController.h"
 #import "LauncherMenuViewController.h"
 #import "LauncherNavigationController.h"
@@ -301,6 +302,11 @@
 
     NSString *versionId = PLProfiles.current.profiles[self.versionTextField.text][@"lastVersionId"];
     if ([HorizonGame isHorizonVersion:versionId]) {
+        // First Play with no game files: set them up from here, no trip to Library
+        if (HorizonGame.engineAvailable && !HorizonGame.resourcesReady && HorizonSetup.available) {
+            [self confirmHorizonSetUp];
+            return;
+        }
         NSString *problem = HorizonGame.startProblem;
         if (problem) {
             showDialog(@"Can't start Horizon", problem);
@@ -329,6 +335,44 @@
     } retry:^{
         [weakSelf launchMinecraft:sender];
     }];
+}
+
+// Horizon can't ship Mojang's 26.3 files, so the first Play fetches 26.3 from Mojang and builds
+// them here, the way Library > Horizon > Set up on this device does
+- (void)confirmHorizonSetUp {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Set up Horizon"
+        message:@"Horizon needs its 26.3 game files once. AMADORA downloads Minecraft 26.3 from Mojang (about 700 MB, use Wi-Fi), then builds them with JIT on, which takes several minutes. AMADORA closes when it's done: open it again and press Play."
+        preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Set up" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [self setUpHorizon];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)setUpHorizon {
+    [self setInteractionEnabled:NO forDownloading:NO];
+    self.progressText.text = @"Setting up Horizon…";
+    __block UIBackgroundTaskIdentifier background = [UIApplication.sharedApplication beginBackgroundTaskWithExpirationHandler:^{
+        [UIApplication.sharedApplication endBackgroundTask:background];
+    }];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSString *error = [HorizonSetup downloadWithProgress:^(NSString *status) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self.progressText.text = status;
+            });
+        }];
+        NSString *jar = error ? nil : [HorizonSetup prepareLaunchJar:&error];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [UIApplication.sharedApplication endBackgroundTask:background];
+            [self setInteractionEnabled:YES forDownloading:NO];
+            if (error) {
+                showDialog(@"Couldn't set up Horizon", error);
+                return;
+            }
+            [self enterModInstallerWithPath:jar hitEnterAfterWindowShown:NO];
+        });
+    });
 }
 
 - (void)launchHorizon:(NSString *)profileName {
