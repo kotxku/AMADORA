@@ -572,6 +572,61 @@ static HorizonControlsView *controls;
     return nil;
 }
 
+static NSString *const kContentMods = @"content-mods";
+
+// "key:value" lines, as horizon-graphics.txt keeps them
+static NSMutableDictionary<NSString *, NSString *> *graphicsSettings(NSString *text, NSMutableArray<NSString *> *order) {
+    NSMutableDictionary *settings = [NSMutableDictionary new];
+    for (NSString *line in [text componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]) {
+        NSRange colon = [line rangeOfString:@":"];
+        if (colon.location == NSNotFound) continue;
+        NSString *key = [line substringToIndex:colon.location];
+        if (!settings[key]) [order addObject:key];
+        settings[key] = [line substringFromIndex:colon.location + 1];
+    }
+    return settings;
+}
+
++ (NSString *)importModpackZip:(NSString *)zipPath gameDir:(NSString *)gameDir progress:(void (^)(NSString *))progress {
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSError *error;
+    UZKArchive *archive = [[UZKArchive alloc] initWithPath:zipPath error:&error];
+    NSArray<UZKFileInfo *> *infos = [archive listFileInfo:&error];
+    if (!infos) {
+        return [NSString stringWithFormat:@"Couldn't open %@ as a zip: %@", zipPath.lastPathComponent, error.localizedDescription];
+    }
+    if (![[infos valueForKey:@"filename"] containsObject:@"horizon-modpack.json"]) {
+        return @"That zip isn't a Horizon modpack. Make one on your computer with export-horizon-modpack.ps1.";
+    }
+    NSUInteger done = 0;
+    for (UZKFileInfo *info in infos) {
+        NSString *name = info.filename;
+        if (!name.length || [name hasPrefix:@"/"] || [name containsString:@"\\"] ||
+            [[name componentsSeparatedByString:@"/"] containsObject:@".."]) continue;
+        NSString *target = [gameDir stringByAppendingPathComponent:name];
+        if ([name isEqualToString:@"horizon-graphics.txt"]) {
+            // The pack's settings (its shader) over the instance's tuned ones
+            NSData *data = [archive extractData:info error:&error];
+            if (!data) return [NSString stringWithFormat:@"Couldn't read the pack's graphics settings: %@", error.localizedDescription];
+            NSMutableArray *order = [NSMutableArray new];
+            NSMutableDictionary *settings = graphicsSettings([NSString stringWithContentsOfFile:target encoding:NSUTF8StringEncoding error:nil] ?: @"", order);
+            [settings addEntriesFromDictionary:graphicsSettings([[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: @"", order)];
+            NSMutableString *merged = [NSMutableString new];
+            for (NSString *key in order) [merged appendFormat:@"%@:%@\n", key, settings[key]];
+            [merged writeToFile:target atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            continue;
+        }
+        [fm removeItemAtPath:target error:nil];
+        if (![PandoraImport extract:info from:archive to:target error:&error]) {
+            return [NSString stringWithFormat:@"Couldn't extract %@: %@", name, error.localizedDescription];
+        }
+        if (++done % 200 == 0 && progress) {
+            progress([NSString stringWithFormat:@"Extracted %lu of %lu files", (unsigned long)done, (unsigned long)infos.count]);
+        }
+    }
+    return nil;
+}
+
 static BOOL loadEngine(NSString **message) {
     if (h_main) return YES;
     void *lib = dlopen(engineLibraryPath().UTF8String, RTLD_NOW | RTLD_LOCAL);
@@ -684,6 +739,14 @@ static void watchGameWindow(void) {
     } else {
         NSString *name = BaseAuthenticator.current.authData[@"username"];
         if (name.length) [args addObjectsFromArray:@[@"--name", name]];
+    }
+    // A modpack's content mods (importModpackZip:), always on
+    NSString *modsDir = [home stringByAppendingPathComponent:kContentMods];
+    for (NSString *folder in [[NSFileManager.defaultManager contentsOfDirectoryAtPath:modsDir error:nil] sortedArrayUsingSelector:@selector(compare:)]) {
+        NSString *mod = [modsDir stringByAppendingPathComponent:folder];
+        if ([NSFileManager.defaultManager fileExistsAtPath:[mod stringByAppendingPathComponent:@"horizon-mod.toml"]]) {
+            [args addObjectsFromArray:@[@"--dev-mod", mod]];
+        }
     }
 
     connectKeyboardAndMouse();

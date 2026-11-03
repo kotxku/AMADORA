@@ -18,6 +18,7 @@ typedef NS_ENUM(NSInteger, HorizonSection) {
 @interface HorizonViewController () <UIDocumentPickerDelegate>
 @property(nonatomic, copy) NSString *importStatus;
 @property(nonatomic) NSArray<NSString *> *instances;
+@property(nonatomic) BOOL pickingModpack;
 @end
 
 @implementation HorizonViewController
@@ -63,7 +64,7 @@ typedef NS_ENUM(NSInteger, HorizonSection) {
         case kHorizonFiles:
             return @"Horizon needs files made from Minecraft 26.3, shared by every Horizon instance. Set up on this device downloads 26.3 from Mojang (about 700 MB) and builds them here with JIT on; AMADORA closes when it's done. Or, on a computer with the Horizon launcher, run export-horizon.ps1 and import its horizon-26.3.zip.";
         default:
-            return @"A Horizon instance works like any other: select it and press Play, and add resource packs and shaders on its page from Modrinth, CurseForge or a file. You can also make one from Instances > + > Horizon.";
+            return @"A Horizon instance works like any other: select it and press Play, and add resource packs and shaders on its page from Modrinth, CurseForge or a file. You can also make one from Instances > + > Horizon. A Horizon modpack zip (export-horizon-modpack.ps1 on a computer) becomes a new instance with its content mods, shaders and resource packs.";
     }
 }
 
@@ -77,7 +78,7 @@ typedef NS_ENUM(NSInteger, HorizonSection) {
     switch (section) {
         case kHorizonStatus: return 2;
         case kHorizonFiles: return 2;
-        default: return self.instances.count + 1;
+        default: return self.instances.count + 2;
     }
 }
 
@@ -97,7 +98,7 @@ typedef NS_ENUM(NSInteger, HorizonSection) {
         BOOL setUp = indexPath.row == 0;
         NSString *title = setUp ? @"Set up on this device"
             : (HorizonGame.resourcesReady ? @"Replace from a zip (from a PC)…" : @"Import from a zip (from a PC)…");
-        cell.textLabel.text = setUp ? (self.importStatus ?: title) : title;
+        cell.textLabel.text = setUp && !self.pickingModpack ? (self.importStatus ?: title) : title;
         cell.textLabel.numberOfLines = 0;
         cell.textLabel.textColor = self.importStatus ? PLTheme.muted : PLTheme.accent;
         cell.imageView.image = [UIImage systemImageNamed:setUp ? @"arrow.down.circle" : @"square.and.arrow.down"];
@@ -110,9 +111,11 @@ typedef NS_ENUM(NSInteger, HorizonSection) {
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     } else {
-        cell.textLabel.text = @"New Horizon instance…";
+        BOOL import = indexPath.row > self.instances.count;
+        cell.textLabel.text = import ? (self.importStatus && self.pickingModpack ? self.importStatus : @"Import a Horizon modpack (from a PC)…") : @"New Horizon instance…";
+        cell.textLabel.numberOfLines = 0;
         cell.textLabel.textColor = PLTheme.accent;
-        cell.imageView.image = [UIImage systemImageNamed:@"plus"];
+        cell.imageView.image = [UIImage systemImageNamed:import ? @"shippingbox" : @"plus"];
         cell.imageView.tintColor = PLTheme.accent;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     }
@@ -124,12 +127,17 @@ typedef NS_ENUM(NSInteger, HorizonSection) {
     if (indexPath.section == kHorizonFiles && !self.importStatus && indexPath.row == 0) {
         [self confirmSetUp];
     } else if (indexPath.section == kHorizonFiles && !self.importStatus) {
-        UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeZIP] asCopy:YES];
-        picker.delegate = self;
-        [self presentViewController:picker animated:YES completion:nil];
+        [self pickZipForModpack:NO];
     } else if (indexPath.section == kHorizonInstances) {
         if (indexPath.row < self.instances.count) {
             [self openInstance:self.instances[indexPath.row]];
+        } else if (indexPath.row > self.instances.count) {
+            if (self.importStatus) return;
+            if (!HorizonGame.resourcesReady) {
+                showDialog(@"Set up Horizon first", @"A modpack needs Horizon's game files: set them up under Game files, then import it.");
+                return;
+            }
+            [self pickZipForModpack:YES];
         } else {
             [HorizonViewController promptNewInstanceFrom:self then:^(NSString *name) {
                 [self reload];
@@ -214,9 +222,59 @@ typedef NS_ENUM(NSInteger, HorizonSection) {
     [presenter presentViewController:alert animated:YES completion:nil];
 }
 
+- (void)pickZipForModpack:(BOOL)modpack {
+    self.pickingModpack = modpack;
+    UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeZIP] asCopy:YES];
+    picker.delegate = self;
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+// A new instance named after the zip, holding the modpack
+- (void)importModpack:(NSString *)path {
+    NSString *base = [path.lastPathComponent.stringByDeletingPathExtension stringByReplacingOccurrencesOfString:@"/" withString:@" "];
+    if (!base.length || [base hasPrefix:@"."]) base = @"Horizon modpack";
+    NSString *name = base;
+    for (int i = 2; PLProfiles.current.profiles[name]; i++) name = [NSString stringWithFormat:@"%@ %d", base, i];
+    NSString *error = [HorizonGame createInstanceNamed:name];
+    if (error) {
+        showDialog(@"Couldn't make the instance", error);
+        return;
+    }
+    NSString *gameDir = [PLProfiles gameDirForProfile:PLProfiles.current.profiles[name]];
+    self.importStatus = @"Importing the modpack…";
+    [self reload];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSString *error = [HorizonGame importModpackZip:path gameDir:gameDir progress:^(NSString *status) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self.importStatus = status;
+                [self.tableView reloadData];
+            });
+        }];
+        [NSFileManager.defaultManager removeItemAtPath:path error:nil];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.importStatus = nil;
+            if (error) {
+                [PLProfiles.current.profiles removeObjectForKey:name];
+                [PLProfiles.current save];
+                [NSFileManager.defaultManager removeItemAtPath:gameDir error:nil];
+                [self reload];
+                showDialog(@"Couldn't import the modpack", error);
+                return;
+            }
+            [self reload];
+            [self openInstance:name];
+            showDialog(@"Modpack imported", [NSString stringWithFormat:@"%@ is a new Horizon instance with the pack's content mods, shaders and resource packs. Press Play; a big pack takes a few minutes to load the first time.", name]);
+        });
+    });
+}
+
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
     NSString *path = urls.firstObject.path;
     if (!path) return;
+    if (self.pickingModpack) {
+        [self importModpack:path];
+        return;
+    }
     // Packs in the zip go to the first Horizon instance, made now when there is none
     NSString *instance = HorizonGame.defaultInstanceName;
     NSString *packsGameDir = [PLProfiles gameDirForProfile:PLProfiles.current.profiles[instance]];

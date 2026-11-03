@@ -36,6 +36,13 @@
 // Returns nil on success, else what went wrong.
 + (NSString *)importResourcesZip:(NSString *)zipPath packsGameDir:(NSString *)packsGameDir progress:(void (^)(NSString *status))progress;
 
+// Unpacks a Horizon modpack zip (export-horizon-modpack.ps1: horizon-modpack.json, content-mods/,
+// shaderpacks/, resourcepacks/, horizon-graphics.txt) into an instance's game folder. Each folder
+// of content-mods/ with a horizon-mod.toml is a content mod (a Horizon port's carry folder) that
+// Play loads with --dev-mod, in name order. The pack's graphics lines replace the same settings
+// of the instance's. Blocking; call off the main thread. Returns nil on success, else what went wrong.
++ (NSString *)importModpackZip:(NSString *)zipPath gameDir:(NSString *)gameDir progress:(void (^)(NSString *status))progress;
+
 // Starts the game in an instance's game folder with the selected account. Does not return while
 // the game runs; returns an error message when it can't start. Call it from the run loop (a
 // timer or performSelector:afterDelay:), not inside a touch's handling.
