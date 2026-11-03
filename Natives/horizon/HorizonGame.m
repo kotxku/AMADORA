@@ -1,6 +1,7 @@
 #import <GameController/GameController.h>
 #import "authenticator/BaseAuthenticator.h"
 #import "installer/PandoraImport.h"
+#import "PLProfiles.h"
 #import "horizon/HorizonGame.h"
 #import "UnzipKit.h"
 
@@ -465,41 +466,41 @@ static HorizonControlsView *controls;
     return [self.homePath stringByAppendingPathComponent:@"resources"];
 }
 
-+ (NSString *)packsPath:(NSString *)folder {
-    return [self.homePath stringByAppendingPathComponent:folder];
++ (NSString *)horizonVersionId {
+    return @"horizon-26.3";
 }
 
-+ (NSArray<NSString *> *)packsIn:(NSString *)folder {
-    NSArray *names = [NSFileManager.defaultManager contentsOfDirectoryAtPath:[self packsPath:folder] error:nil];
-    return [[names filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"self ENDSWITH[c] '.zip'"]]
-        sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
++ (BOOL)isHorizonVersion:(NSString *)versionId {
+    return [versionId isKindOfClass:NSString.class] && [versionId hasPrefix:@"horizon-"];
 }
 
-+ (NSString *)importPack:(NSString *)zipPath into:(NSString *)folder {
-    NSError *error;
-    UZKArchive *archive = [[UZKArchive alloc] initWithPath:zipPath error:&error];
-    NSArray<NSString *> *names = [archive listFilenames:&error];
-    if (!names) {
-        return [NSString stringWithFormat:@"Couldn't open %@ as a zip: %@", zipPath.lastPathComponent, error.localizedDescription];
++ (NSArray<NSString *> *)instanceNames {
+    NSDictionary *profiles = PLProfiles.current.profiles;
+    return [[profiles.allKeys filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(NSString *name, NSDictionary *b) {
+        return [self isHorizonVersion:profiles[name][@"lastVersionId"]];
+    }]] sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
+}
+
++ (NSString *)createInstanceNamed:(NSString *)name {
+    name = [name stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if (!name.length || [name containsString:@"/"] || [name hasPrefix:@"."]) return @"Give the instance a name without slashes.";
+    if (PLProfiles.current.profiles[name]) return [NSString stringWithFormat:@"There is already an instance called %@.", name];
+    NSString *gameDir = [@"./custom_gamedir" stringByAppendingPathComponent:name];
+    NSMutableDictionary *profile = @{@"name": name, @"gameDir": gameDir, @"lastVersionId": self.horizonVersionId}.mutableCopy;
+    for (NSString *folder in @[@"", @"resourcepacks", @"shaderpacks"]) {
+        [NSFileManager.defaultManager createDirectoryAtPath:[[PLProfiles gameDirForProfile:profile] stringByAppendingPathComponent:folder]
+            withIntermediateDirectories:YES attributes:nil error:nil];
     }
-    BOOL shaders = [folder isEqualToString:@"shaderpacks"], fits = NO;
-    for (NSString *raw in names) {
-        NSString *name = [raw stringByReplacingOccurrencesOfString:@"\\" withString:@"/"];
-        if (shaders ? [name hasPrefix:@"shaders/"] : [name isEqualToString:@"pack.mcmeta"]) fits = YES;
-    }
-    if (!fits) {
-        return shaders ? @"That zip isn't a shader pack: it has no shaders/ folder at its top. Horizon takes Iris/OptiFine-format packs."
-            : @"That zip isn't a resource pack: it has no pack.mcmeta at its top.";
-    }
-    NSFileManager *fm = NSFileManager.defaultManager;
-    NSString *dir = [self packsPath:folder];
-    [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
-    NSString *dest = [dir stringByAppendingPathComponent:zipPath.lastPathComponent];
-    [fm removeItemAtPath:dest error:nil];
-    if (![fm copyItemAtPath:zipPath toPath:dest error:&error]) {
-        return [NSString stringWithFormat:@"Couldn't add the pack: %@", error.localizedDescription];
-    }
+    PLProfiles.current.profiles[name] = profile;
+    PLProfiles.current.selectedProfileName = name; // also saves
     return nil;
+}
+
++ (NSString *)defaultInstanceName {
+    NSString *name = self.instanceNames.firstObject;
+    if (name) return name;
+    [self createInstanceNamed:@"Horizon"];
+    return @"Horizon";
 }
 
 + (BOOL)engineAvailable {
@@ -510,7 +511,7 @@ static HorizonControlsView *controls;
     return [NSFileManager.defaultManager fileExistsAtPath:[self.resourcesPath stringByAppendingPathComponent:@"horizon-resources.json"]];
 }
 
-+ (NSString *)importResourcesZip:(NSString *)zipPath progress:(void (^)(NSString *))progress {
++ (NSString *)importResourcesZip:(NSString *)zipPath packsGameDir:(NSString *)packsGameDir progress:(void (^)(NSString *))progress {
     NSFileManager *fm = NSFileManager.defaultManager;
     NSError *error;
     UZKArchive *archive = [[UZKArchive alloc] initWithPath:zipPath error:&error];
@@ -539,7 +540,7 @@ static HorizonControlsView *controls;
         NSString *packFolder = name.pathComponents.firstObject;
         BOOL isPackFolder = [@[@"shaderpacks", @"resourcepacks"] containsObject:packFolder];
         if (isPackFolder && [name.pathExtension.lowercaseString isEqualToString:@"zip"] && name.pathComponents.count == 2) {
-            NSString *pack = [[self packsPath:packFolder] stringByAppendingPathComponent:name.lastPathComponent];
+            NSString *pack = [[packsGameDir stringByAppendingPathComponent:packFolder] stringByAppendingPathComponent:name.lastPathComponent];
             [fm removeItemAtPath:pack error:nil];
             if (![PandoraImport extract:info from:archive to:pack error:&error]) {
                 return [NSString stringWithFormat:@"Couldn't extract the pack %@: %@", name.lastPathComponent, error.localizedDescription];
@@ -657,13 +658,14 @@ static void watchGameWindow(void) {
     [NSRunLoop.mainRunLoop addTimer:timer forMode:NSRunLoopCommonModes];
 }
 
-+ (NSString *)start {
++ (NSString *)startInGameDir:(NSString *)gameDir {
     NSString *message;
     if (!self.engineAvailable) return @"This build of AMADORA doesn't include the Horizon engine.";
     if (!self.resourcesReady) return @"Import Horizon's game files first.";
     if (!loadEngine(&message)) return message;
 
-    NSString *home = self.homePath;
+    // The instance's folder is the game's: saves, options, logs and packs
+    NSString *home = gameDir;
     [NSFileManager.defaultManager createDirectoryAtPath:home withIntermediateDirectories:YES attributes:nil error:nil];
     // The game keeps servers.dat and the like in its working folder
     chdir(home.fileSystemRepresentation);

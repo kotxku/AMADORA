@@ -16,6 +16,7 @@
 #import "UIKit+hook.h"
 #import "installer/FabricInstallViewController.h"
 #import "installer/ForgeInstallViewController.h"
+#import "horizon/HorizonViewController.h"
 #import "installer/ModDoctor.h"
 #import "installer/ModpackInstallViewController.h"
 #import "installer/PandoraImport.h"
@@ -72,6 +73,14 @@ typedef NS_ENUM(NSUInteger, LauncherProfilesTableSection) {
             actionWithTitle:@"Forge" image:nil
             identifier:@"forge" handler:^(UIAction *action) {
                 [self actionCreateForgeProfile];
+            }],
+        [UIAction
+            actionWithTitle:@"Horizon (26.3 in Rust)" image:nil
+            identifier:@"horizon" handler:^(UIAction *action) {
+                [HorizonViewController promptNewInstanceFrom:self then:^(NSString *name) {
+                    [self.tableView reloadData];
+                    [self.navigationController performSelector:@selector(reloadProfileList)];
+                }];
             }],
         [UIAction
             actionWithTitle:@"Modpack" image:nil

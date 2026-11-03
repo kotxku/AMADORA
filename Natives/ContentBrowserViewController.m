@@ -1,6 +1,7 @@
 #import "ContentBrowserViewController.h"
 #import "installer/modpack/ModrinthAPI.h"
 #import "installer/PandoraImport.h"
+#import "horizon/HorizonGame.h"
 #import "PLProfiles.h"
 #import "PLTheme.h"
 #pragma clang diagnostic push
@@ -161,6 +162,10 @@
 }
 
 - (NSArray<NSNumber *> *)types {
+    // Horizon runs no Java mods: only packs go into its instances
+    if (self.targetProfileName && [HorizonGame isHorizonVersion:PLProfiles.current.profiles[self.targetProfileName][@"lastVersionId"]]) {
+        return @[@(PLContentTypeResourcePack), @(PLContentTypeShader)];
+    }
     // CurseForge modpacks have no in-app installer; their zips go through Add Custom Modpack
     if (self.targetProfileName || self.source == PLContentSourceCurseForge) {
         return @[@(PLContentTypeMod), @(PLContentTypeResourcePack), @(PLContentTypeShader)];

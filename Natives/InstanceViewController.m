@@ -11,6 +11,7 @@
 #import "installer/ContentInstaller.h"
 #import "installer/PandoraImport.h"
 #import "installer/RocketCraftInstaller.h"
+#import "horizon/HorizonGame.h"
 #import "ios_uikit_bridge.h"
 #import "utils.h"
 
@@ -113,8 +114,14 @@
     return [PLProfiles gameDirForProfile:self.profile];
 }
 
+// Horizon runs no Java mods: its instances have only packs
+- (BOOL)isHorizon {
+    return [HorizonGame isHorizonVersion:self.profile[@"lastVersionId"]];
+}
+
 - (PLContentType)type {
-    NSArray<NSNumber *> *types = @[@(PLContentTypeMod), @(PLContentTypeResourcePack), @(PLContentTypeShader)];
+    NSArray<NSNumber *> *types = self.isHorizon ? @[@(PLContentTypeResourcePack), @(PLContentTypeShader)]
+        : @[@(PLContentTypeMod), @(PLContentTypeResourcePack), @(PLContentTypeShader)];
     return (PLContentType)types[self.folderControl.selectedSegmentIndex].integerValue;
 }
 
@@ -133,7 +140,7 @@
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"gearshape"]
         style:UIBarButtonItemStylePlain target:self action:@selector(openSettings)];
 
-    self.folderControl = [[UISegmentedControl alloc] initWithItems:@[@"Mods", @"Resource Packs", @"Shaders"]];
+    self.folderControl = [[UISegmentedControl alloc] initWithItems:self.isHorizon ? @[@"Resource Packs", @"Shaders"] : @[@"Mods", @"Resource Packs", @"Shaders"]];
     self.folderControl.selectedSegmentIndex = 0;
     [self.folderControl addTarget:self action:@selector(reloadFiles) forControlEvents:UIControlEventValueChanged];
 
@@ -148,6 +155,8 @@
     UIStackView *addButtons = [[UIStackView alloc] initWithArrangedSubviews:@[modrinth, curseForge, file]];
     addButtons.spacing = 8;
     addButtons.distribution = UIStackViewDistributionFillProportionally;
+    // Rocket Craft is a Fabric modpack
+    rocketCraft.hidden = self.isHorizon;
     UIStackView *buttons = [[UIStackView alloc] initWithArrangedSubviews:@[addButtons, rocketCraft]];
     buttons.axis = UILayoutConstraintAxisVertical;
     buttons.alignment = UIStackViewAlignmentLeading;

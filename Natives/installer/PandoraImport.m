@@ -13,6 +13,7 @@ static id typed(id obj, Class cls) {
 + (NSDictionary<NSString *, NSString *> *)loaderInfoForVersionId:(NSString *)versionId {
     // shortcut: assumes the Minecraft version has no '-', so snapshot/pre-release ids are misread; store the version in the profile if that matters
     NSArray<NSString *> *parts = [versionId componentsSeparatedByString:@"-"];
+    if ([versionId hasPrefix:@"horizon-"]) return @{@"loader": @"horizon", @"mc": [versionId substringFromIndex:8]};
     if ([versionId hasPrefix:@"fabric-loader-"]) return @{@"loader": @"fabric", @"mc": parts.lastObject};
     if ([versionId hasPrefix:@"quilt-loader-"]) return @{@"loader": @"quilt", @"mc": parts.lastObject};
     if ([versionId containsString:@"-forge-"]) return @{@"loader": @"forge", @"mc": parts.firstObject};
