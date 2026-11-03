@@ -465,36 +465,39 @@ static HorizonControlsView *controls;
     return [self.homePath stringByAppendingPathComponent:@"resources"];
 }
 
-+ (NSString *)shaderpacksPath {
-    return [self.homePath stringByAppendingPathComponent:@"shaderpacks"];
++ (NSString *)packsPath:(NSString *)folder {
+    return [self.homePath stringByAppendingPathComponent:folder];
 }
 
-+ (NSArray<NSString *> *)shaderPacks {
-    NSArray *names = [NSFileManager.defaultManager contentsOfDirectoryAtPath:self.shaderpacksPath error:nil];
++ (NSArray<NSString *> *)packsIn:(NSString *)folder {
+    NSArray *names = [NSFileManager.defaultManager contentsOfDirectoryAtPath:[self packsPath:folder] error:nil];
     return [[names filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"self ENDSWITH[c] '.zip'"]]
         sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
 }
 
-+ (NSString *)importShaderPack:(NSString *)zipPath {
++ (NSString *)importPack:(NSString *)zipPath into:(NSString *)folder {
     NSError *error;
     UZKArchive *archive = [[UZKArchive alloc] initWithPath:zipPath error:&error];
     NSArray<NSString *> *names = [archive listFilenames:&error];
     if (!names) {
         return [NSString stringWithFormat:@"Couldn't open %@ as a zip: %@", zipPath.lastPathComponent, error.localizedDescription];
     }
-    BOOL isPack = NO;
-    for (NSString *name in names) {
-        if ([[name stringByReplacingOccurrencesOfString:@"\\" withString:@"/"] hasPrefix:@"shaders/"]) isPack = YES;
+    BOOL shaders = [folder isEqualToString:@"shaderpacks"], fits = NO;
+    for (NSString *raw in names) {
+        NSString *name = [raw stringByReplacingOccurrencesOfString:@"\\" withString:@"/"];
+        if (shaders ? [name hasPrefix:@"shaders/"] : [name isEqualToString:@"pack.mcmeta"]) fits = YES;
     }
-    if (!isPack) {
-        return @"That zip isn't a shader pack: it has no shaders/ folder at its top. Horizon takes Iris/OptiFine-format packs.";
+    if (!fits) {
+        return shaders ? @"That zip isn't a shader pack: it has no shaders/ folder at its top. Horizon takes Iris/OptiFine-format packs."
+            : @"That zip isn't a resource pack: it has no pack.mcmeta at its top.";
     }
     NSFileManager *fm = NSFileManager.defaultManager;
-    [fm createDirectoryAtPath:self.shaderpacksPath withIntermediateDirectories:YES attributes:nil error:nil];
-    NSString *dest = [self.shaderpacksPath stringByAppendingPathComponent:zipPath.lastPathComponent];
+    NSString *dir = [self packsPath:folder];
+    [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+    NSString *dest = [dir stringByAppendingPathComponent:zipPath.lastPathComponent];
     [fm removeItemAtPath:dest error:nil];
     if (![fm copyItemAtPath:zipPath toPath:dest error:&error]) {
-        return [NSString stringWithFormat:@"Couldn't add the shader pack: %@", error.localizedDescription];
+        return [NSString stringWithFormat:@"Couldn't add the pack: %@", error.localizedDescription];
     }
     return nil;
 }
@@ -532,18 +535,19 @@ static HorizonControlsView *controls;
     NSUInteger done = 0;
     for (UZKFileInfo *info in infos) {
         NSString *name = [info.filename stringByReplacingOccurrencesOfString:@"\\" withString:@"/"];
-        // Shader packs the export carried along (export-horizon.ps1 -ShaderPacks)
-        if ([name hasPrefix:@"shaderpacks/"] && [name.pathExtension.lowercaseString isEqualToString:@"zip"] &&
-            name.pathComponents.count == 2) {
-            NSString *pack = [self.shaderpacksPath stringByAppendingPathComponent:name.lastPathComponent];
+        // Packs the export carried along (export-horizon.ps1 -ShaderPacks, -ResourcePacks)
+        NSString *packFolder = name.pathComponents.firstObject;
+        BOOL isPackFolder = [@[@"shaderpacks", @"resourcepacks"] containsObject:packFolder];
+        if (isPackFolder && [name.pathExtension.lowercaseString isEqualToString:@"zip"] && name.pathComponents.count == 2) {
+            NSString *pack = [[self packsPath:packFolder] stringByAppendingPathComponent:name.lastPathComponent];
             [fm removeItemAtPath:pack error:nil];
             if (![PandoraImport extract:info from:archive to:pack error:&error]) {
-                return [NSString stringWithFormat:@"Couldn't extract the shader pack %@: %@", name.lastPathComponent, error.localizedDescription];
+                return [NSString stringWithFormat:@"Couldn't extract the pack %@: %@", name.lastPathComponent, error.localizedDescription];
             }
             continue;
         }
         if (![name hasPrefix:prefix]) continue;
-        if (!prefix.length && [name hasPrefix:@"shaderpacks/"]) continue;
+        if (!prefix.length && isPackFolder) continue;
         NSString *relative = [name substringFromIndex:prefix.length];
         if (!relative.length || [relative hasPrefix:@"/"] || [[relative componentsSeparatedByString:@"/"] containsObject:@".."]) continue;
         if (![PandoraImport extract:info from:archive to:[staging stringByAppendingPathComponent:relative] error:&error]) {
