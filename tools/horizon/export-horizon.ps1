@@ -2,10 +2,12 @@
 # Run it on the computer where the Horizon launcher (playhorizon.dev) has prepared 26.3: install the
 # launcher, sign in with the Microsoft account that owns Java Edition, and press Play once.
 #   powershell -ExecutionPolicy Bypass -File export-horizon.ps1
-# Shader pack zips come along too: those in Horizon's own shaderpacks folder, and those in a folder
-# you name (for your personal use; most packs' licences forbid sharing them):
-#   powershell -ExecutionPolicy Bypass -File export-horizon.ps1 -ShaderPacks "E:\minecraft rust rewrite mods and shaders\shaders"
-param([string]$ShaderPacks)
+# Shader and resource pack zips come along too: those in Horizon's own shaderpacks and resourcepacks
+# folders, and those in folders you name (for your personal use; most packs' licences forbid sharing them):
+#   powershell -ExecutionPolicy Bypass -File export-horizon.ps1 `
+#     -ShaderPacks "E:\minecraft rust rewrite mods and shaders\shaders" `
+#     -ResourcePacks "E:\minecraft rust rewrite mods and shaders\resource packs"
+param([string]$ShaderPacks, [string]$ResourcePacks)
 $ErrorActionPreference = 'Stop'
 
 $launcherHome = if ($env:HORIZON_LAUNCHER_HOME) { $env:HORIZON_LAUNCHER_HOME } else { Join-Path $env:APPDATA 'horizon-launcher' }
@@ -34,21 +36,25 @@ Write-Host "Zipping $resources"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($resources, $zip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
 
-# Shader packs ride along in shaderpacks/; AMADORA puts them in Horizon's shaderpacks folder
-$packDirs = @((Join-Path $env:APPDATA 'horizon\shaderpacks'))
-if ($ShaderPacks) { $packDirs += $ShaderPacks }
-$packs = @($packDirs | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem -Path $_ -Filter '*.zip' -File } |
-    Sort-Object Name -Unique)
-if ($packs.Count) {
-    $archive = [System.IO.Compression.ZipFile]::Open($zip, [System.IO.Compression.ZipArchiveMode]::Update)
-    try {
+# Packs ride along in shaderpacks/ and resourcepacks/; AMADORA puts them in Horizon's folders of those names
+$kinds = @(
+    @{ Folder = 'shaderpacks'; Extra = $ShaderPacks; Label = 'shader' },
+    @{ Folder = 'resourcepacks'; Extra = $ResourcePacks; Label = 'resource' }
+)
+$archive = [System.IO.Compression.ZipFile]::Open($zip, [System.IO.Compression.ZipArchiveMode]::Update)
+try {
+    foreach ($kind in $kinds) {
+        $dirs = @((Join-Path $env:APPDATA "horizon\$($kind.Folder)"))
+        if ($kind.Extra) { $dirs += $kind.Extra }
+        $packs = @($dirs | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem -Path $_ -Filter '*.zip' -File } |
+            Sort-Object Name -Unique)
         foreach ($pack in $packs) {
-            Write-Host "Adding shader pack $($pack.Name)"
-            [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $pack.FullName, "shaderpacks/$($pack.Name)", [System.IO.Compression.CompressionLevel]::NoCompression)
+            Write-Host "Adding $($kind.Label) pack $($pack.Name)"
+            [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $pack.FullName, "$($kind.Folder)/$($pack.Name)", [System.IO.Compression.CompressionLevel]::NoCompression)
         }
-    } finally {
-        $archive.Dispose()
     }
+} finally {
+    $archive.Dispose()
 }
 
 $size = '{0:N0} MB' -f ((Get-Item $zip).Length / 1MB)
