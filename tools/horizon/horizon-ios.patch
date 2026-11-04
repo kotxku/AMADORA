@@ -494,14 +494,14 @@ diff --git a/crates/horizon-prepare/src/java.rs b/crates/horizon-prepare/src/jav
 index 1279cc6..a4cf69d 100644
 --- a/crates/horizon-prepare/src/java.rs
 +++ b/crates/horizon-prepare/src/java.rs
-@@ -14,6 +14,35 @@ pub struct Jdk {
+@@ -14,6 +14,49 @@ pub struct Jdk {
  
  const TIMEOUT: Duration = Duration::from_secs(3600);
  
 +/// Runs a Java task in the caller's own JVM instead of a new process, for an app that can't start
 +/// processes (AMADORA on iOS). Its argument lists: `["java", cwd, log, java's arguments...]`,
 +/// `["worker", name, log, classpath, main, args...]` (one bootstrapped classpath per name, kept
-+/// until `["close", name]`). Logs are `/dev/fd/<n>` paths of files the preparer opened.
++/// until `["close", name]`). Logs are paths of files the preparer opened (fd_path).
 +pub type InProcess = fn(&[String]) -> Result<(), String>;
 +
 +static IN_PROCESS: std::sync::OnceLock<InProcess> = std::sync::OnceLock::new();
@@ -515,10 +515,24 @@ index 1279cc6..a4cf69d 100644
 +    IN_PROCESS.get().copied()
 +}
 +
-+/// An open log as a path a JVM in this process can open: the same file and position.
++/// An open log as a path a JVM in this process can open. On Apple systems that's the file's own
++/// path (F_GETPATH): iOS doesn't let Java open /dev/fd/<n>. Java appends to it.
 +#[cfg(unix)]
 +pub(crate) fn fd_path(log: &fs::File) -> String {
 +    use std::os::fd::AsRawFd;
++    #[cfg(target_vendor = "apple")]
++    {
++        unsafe extern "C" {
++            fn fcntl(fd: i32, cmd: i32, ...) -> i32;
++        }
++        const F_GETPATH: i32 = 50;
++        let mut buf = [0u8; 1024];
++        if unsafe { fcntl(log.as_raw_fd(), F_GETPATH, buf.as_mut_ptr()) } != -1 {
++            if let Ok(path) = std::ffi::CStr::from_bytes_until_nul(&buf) {
++                return path.to_string_lossy().into_owned();
++            }
++        }
++    }
 +    format!("/dev/fd/{}", log.as_raw_fd())
 +}
 +
@@ -530,7 +544,7 @@ index 1279cc6..a4cf69d 100644
  /// Options for every JVM preparing starts (the exporters, the data generator, javac with `-J`).
  /// They are short batch jobs that run side by side: the C2 compiler's background work costs
  /// more CPU than it wins back, and the serial collector keeps their heaps small. Measured on the
-@@ -233,6 +262,12 @@ pub fn find(major: i64, more: &[PathBuf]) -> Result<Jdk, String> {
+@@ -233,6 +276,12 @@ pub fn find(major: i64, more: &[PathBuf]) -> Result<Jdk, String> {
  
  /// Finds a compatible runtime; precompiled exporters do not need javac.
  pub fn find_runtime(major: i64, more: &[PathBuf]) -> Result<Jdk, String> {
@@ -543,7 +557,7 @@ index 1279cc6..a4cf69d 100644
      find_tools(major, more, false)
  }
  
-@@ -352,6 +387,9 @@ impl Jdk {
+@@ -352,6 +401,9 @@ impl Jdk {
      /// `javac --release <major> -proc:none` with Python's `subprocess.run(..., check=True,
      /// stdout=log, stderr=STDOUT, timeout=3600)`.
      pub fn javac(&self, major: i64, args: &[String], log: &fs::File) -> Result<(), String> {
@@ -553,7 +567,7 @@ index 1279cc6..a4cf69d 100644
          let mut command = command(&self.javac);
          command
              .args(BATCH_OPTIONS.map(|option| format!("-J{option}")))
-@@ -361,6 +399,12 @@ impl Jdk {
+@@ -361,6 +413,12 @@ impl Jdk {
      }
  
      pub fn java(&self, args: &[String], cwd: Option<&Path>, log: &fs::File) -> Result<(), String> {
