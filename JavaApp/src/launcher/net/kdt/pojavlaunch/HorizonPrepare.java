@@ -118,7 +118,15 @@ public final class HorizonPrepare {
 
     private static void logTo(String path) throws Exception {
         if (path.isEmpty()) return;
-        PrintStream log = new PrintStream(new FileOutputStream(path, true), true, "UTF-8");
+        FileOutputStream file;
+        try {
+            file = new FileOutputStream(path, true);
+        } catch (java.io.FileNotFoundException e) {
+            // A log is no reason to fail the task: its output goes to AMADORA's log instead
+            System.err.println("[Horizon] Can't open the log " + path + ": " + e.getMessage());
+            return;
+        }
+        PrintStream log = new PrintStream(file, true, "UTF-8");
         System.setOut(log);
         System.setErr(log);
     }
