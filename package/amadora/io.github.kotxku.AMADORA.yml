@@ -18,13 +18,15 @@ modules:
     buildsystem: simple
     build-commands:
       - install -Dm755 pandora_launcher /app/bin/amadora
-      - install -Dm644 amadora.desktop /app/share/applications/io.github.kotxku.AMADORA.desktop
-      - install -Dm644 amadora.png /app/share/icons/hicolor/256x256/apps/amadora.png
+      - install -Dm644 io.github.kotxku.AMADORA.desktop /app/share/applications/io.github.kotxku.AMADORA.desktop
+      - install -Dm644 io.github.kotxku.AMADORA.metainfo.xml /app/share/metainfo/io.github.kotxku.AMADORA.metainfo.xml
+      - install -Dm644 icon_256x256.png /app/share/icons/hicolor/256x256/apps/io.github.kotxku.AMADORA.png
     sources:
       - type: file
         path: ../../target/x86_64-unknown-linux-gnu/release/pandora_launcher
       - type: file
-        path: ../../AppDir/usr/share/applications/amadora.desktop
+        path: io.github.kotxku.AMADORA.desktop
+      - type: file
+        path: io.github.kotxku.AMADORA.metainfo.xml
       - type: file
         path: ../amadora_icons/icon_256x256.png
-        dest-filename: amadora.png

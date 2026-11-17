@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=AMADORA
+Comment=Desktop Minecraft launcher
+Exec=amadora
+Icon=amadora
+Terminal=false
+Categories=Game;
+StartupWMClass=AMADORA

@@ -1,0 +1,20 @@
+# Maintainer: AMADORA project
+# Packages a prebuilt AMADORA binary into an Arch .pkg.tar.zst.
+pkgname=amadora
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="AMADORA desktop Minecraft launcher (based on Pandora Launcher)"
+arch=('x86_64')
+url="https://github.com/kotxku/AMADORA"
+license=('MIT')
+depends=('fontconfig' 'libxcb' 'libxkbcommon' 'libxkbcommon-x11' 'vulkan-icd-loader' 'libglvnd')
+options=('!strip' '!debug')
+source=('pandora_launcher' 'icon_256x256.png' 'amadora.desktop' 'LICENSE')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+  install -Dm755 "$srcdir/pandora_launcher" "$pkgdir/usr/bin/amadora"
+  install -Dm644 "$srcdir/icon_256x256.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/amadora.png"
+  install -Dm644 "$srcdir/amadora.desktop" "$pkgdir/usr/share/applications/amadora.desktop"
+  install -Dm644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/amadora/LICENSE"
+}
