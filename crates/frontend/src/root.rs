@@ -82,8 +82,15 @@ impl Render for LauncherRoot {
         let dialog_layer = Root::render_dialog_layer(window, cx);
         let notification_layer = Root::render_notification_layer(window, cx);
 
+        // AMADORA glow: purple gem light from the top-left, teal sparkle light from the bottom-right (matches the iOS app)
+        let purple_glow = gpui::linear_gradient(135., gpui::linear_color_stop(gpui::rgb(0x2b1466), 0.), gpui::linear_color_stop(gpui::rgb(0x170b2c), 0.6));
+        let teal_glow = gpui::linear_gradient(315., gpui::linear_color_stop(gpui::rgba(0x5ee6d02e), 0.), gpui::linear_color_stop(gpui::rgba(0x5ee6d000), 0.55));
+
         v_flex()
             .size_full()
+            .relative()
+            .bg(purple_glow)
+            .child(gpui::div().absolute().inset_0().bg(teal_glow))
             .child(self.ui.clone())
             .children(sheet_layer)
             .children(dialog_layer)
