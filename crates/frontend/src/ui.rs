@@ -446,7 +446,7 @@ impl Render for LauncherUI {
         };
 
         let page_groups: &[(&'static str, &[(bool, &'static str, PandoraIcon, PageType)])] = &[
-            ("Minecraft", &[
+            ("Library", &[
                 (show_quickplay_page, t::quickplay::title(), PandoraIcon::Rocket, PageType::Quickplay),
                 (true, t::instance::title(), PandoraIcon::Box, PageType::Instances),
                 (show_skins, t::skins::title(), PandoraIcon::FaceSlightlySmiling, PageType::Skins),
@@ -455,7 +455,7 @@ impl Render for LauncherUI {
                 (true, t::modrinth::name(), PandoraIcon::CircleCheck, PageType::Modrinth { installing_for: None }),
                 (true, t::curseforge::name(), PandoraIcon::Anvil, PageType::Curseforge { installing_for: None }),
             ]),
-            (t::instance::sync::files(), &[
+            ("Launcher", &[
                 (true, t::import::label(), PandoraIcon::Download, PageType::Import),
                 (true, t::instance::sync::label(), PandoraIcon::RefreshCcw, PageType::Syncing),
             ]),
@@ -482,7 +482,7 @@ impl Render for LauncherUI {
             }
 
             if !self.recent_instances.is_empty() {
-                let mut recent_instances_group = MenuGroup::new(t::instance::recent());
+                let mut recent_instances_group = MenuGroup::new("Recent Instances");
 
                 for instance in &self.recent_instances {
                     let name = instance.name.clone();
@@ -754,14 +754,19 @@ impl Render for LauncherUI {
                 }
             }))
             .when_else(cfg!(target_os = "macos"), |this| this.pt(px(41.0)), |this| this.pt(px(14.0)))
-            .px_5()
-            .pb_2()
-            .gap_2()
+            .px_4()
+            .pb_3()
+            .gap_3()
             .w_full()
             .justify_center()
-            .text_size(rems(0.9375))
-            .child(Icon::new(PandoraIcon::Amadora).size_8().min_w_8().min_h_8())
-            .when(!iconized_sidebar, |this| this.child(t::common::app_name()));
+            .items_center()
+            .child(gpui::img(ImageSource::Resource(Resource::Embedded("images/amadora.png".into()))).size_10().min_w_10().min_h_10().rounded(px(10.0)))
+            .when(!iconized_sidebar, |this| this.child(
+                v_flex()
+                    .gap_0p5()
+                    .child(div().font_family("Minecraft Default").text_size(rems(1.375)).line_height(rems(1.5)).text_color(cx.theme().foreground).child("AMADORA"))
+                    .child(div().text_size(rems(0.625)).text_color(cx.theme().link).child("MINECRAFT LAUNCHER"))
+            ));
         let footer_buttons = h_flex()
             .when(iconized_sidebar, |this| this.flex_col())
             .child(settings_button)
