@@ -1,0 +1,34 @@
+[package]
+name = "pandora_launcher"
+version.workspace = true
+edition.workspace = true
+build = "build.rs"
+
+[dependencies]
+frontend.workspace = true
+backend.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+bridge.workspace = true
+backtrace.workspace = true
+parking_lot.workspace = true
+directories.workspace = true
+clap.workspace = true
+native-dialog.workspace = true
+fern.workspace = true
+log.workspace = true
+humantime.workspace = true
+command.workspace = true
+anyhow.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+sha2.workspace = true
+hex.workspace = true
+futures.workspace = true
+zip.workspace = true
+tar.workspace = true
+flate2.workspace = true
+rand.workspace = true
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+winresource = "0.1.29"

@@ -1,0 +1,75 @@
+name: AMADORA desktop
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/amadora-desktop.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/**'
+      - 'assets/**'
+      - 'package/**'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: AMADORA-Linux-x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: AMADORA-Windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update --yes && sudo apt-get install --yes libssl-dev libdbus-1-dev libx11-xcb1 libxkbcommon-x11-dev pkg-config libseccomp-dev libfontconfig-dev libudev-dev libgl1 libvulkan1 dpkg-dev flatpak flatpak-builder
+      - name: Build
+        run: cargo build --release --frozen -p pandora_launcher --target ${{ matrix.target }}
+      - name: Check Linux shared libraries
+        if: runner.os == 'Linux'
+        run: |
+          ldd target/${{ matrix.target }}/release/pandora_launcher | tee amadora-linux-libraries.txt
+          ! grep -q 'not found' amadora-linux-libraries.txt
+      - name: Build Linux installer
+        if: runner.os == 'Linux'
+        run: bash package/amadora/build-deb.sh
+      - name: Build AppImage and Flatpak
+        if: runner.os == 'Linux'
+        run: bash package/amadora/build-linux-universal.sh
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          & "${env:ProgramFiles(x86)}/NSIS/makensis.exe" package/amadora/windows.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package Linux
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/pandora_launcher dist/AMADORA
+          cp LICENSE dist/LICENSE
+          tar -czf AMADORA-Linux-x86_64.tar.gz -C dist AMADORA LICENSE
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/pandora_launcher.exe" dist/AMADORA.exe
+          Copy-Item LICENSE dist/LICENSE
+          Compress-Archive -Path dist/AMADORA.exe,dist/LICENSE -DestinationPath AMADORA-Windows-x86_64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: AMADORA-*.*
+          if-no-files-found: error
