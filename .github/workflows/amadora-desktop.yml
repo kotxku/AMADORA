@@ -32,7 +32,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install Linux libraries
         if: runner.os == 'Linux'
-        run: sudo apt-get update --yes && sudo apt-get install --yes libssl-dev libdbus-1-dev libx11-xcb1 libxkbcommon-x11-dev pkg-config libseccomp-dev libfontconfig-dev libudev-dev libgl1 libvulkan1 dpkg-dev flatpak flatpak-builder
+        run: sudo apt-get update --yes && sudo apt-get install --yes libssl-dev libdbus-1-dev libx11-xcb1 libxkbcommon-x11-dev pkg-config libseccomp-dev libfontconfig-dev libudev-dev libgl1 libvulkan1 dpkg-dev flatpak flatpak-builder rpm
       - name: Build
         run: cargo build --release --frozen -p pandora_launcher --target ${{ matrix.target }}
       - name: Check Linux shared libraries
@@ -43,6 +43,12 @@ jobs:
       - name: Build Linux installer
         if: runner.os == 'Linux'
         run: bash package/amadora/build-deb.sh
+      - name: Build RPM
+        if: runner.os == 'Linux'
+        run: bash package/amadora/build-rpm.sh
+      - name: Build Arch package
+        if: runner.os == 'Linux'
+        run: bash package/amadora/build-arch.sh
       - name: Build AppImage and Flatpak
         if: runner.os == 'Linux'
         run: bash package/amadora/build-linux-universal.sh

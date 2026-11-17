@@ -33,4 +33,6 @@ This project retains the original Pandora Launcher license and attribution in `L
 
 The desktop branch builds `AMADORA-Windows-x86_64-Setup.exe` (per-user installation, Start menu shortcut and uninstaller) and `AMADORA-Linux-x86_64.deb` (Ubuntu/Debian package, application menu entry and resolved shared-library dependencies). Install the Debian package with `sudo apt install ./AMADORA-Linux-x86_64.deb`. Portable archives remain available. These are development builds; the parity limitations above still apply. Windows installers are unsigned. Linux packages use the build runner’s library baseline.
 
+Linux builds also produce `AMADORA-Linux-x86_64.rpm` (Fedora/openSUSE: `sudo dnf install ./AMADORA-Linux-x86_64.rpm`) and `AMADORA-Linux-x86_64.pkg.tar.zst` (Arch/CachyOS/Manjaro: `sudo pacman -U AMADORA-Linux-x86_64.pkg.tar.zst`; built in an Arch container in CI).
+
 Linux builds additionally produce an AppImage and a Flatpak bundle. Install the Flatpak with `flatpak install --user ./AMADORA-Linux-x86_64.flatpak`; its runtime is fetched from Flathub. The Flatpak permits home-directory and device access for Minecraft instances and controllers. AppImage builds require the host GPU drivers and a compatible glibc (built on Ubuntu 22.04).
