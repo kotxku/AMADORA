@@ -7,7 +7,10 @@ trap 'rm -rf "$work"' EXIT
 cp package/amadora/PKGBUILD package/amadora/amadora.desktop package/amadora_icons/icon_256x256.png LICENSE "$work/"
 cp target/x86_64-unknown-linux-gnu/release/pandora_launcher "$work/"
 chmod -R a+rwX "$work"
-docker run --rm -v "$work:/pkg" -w /pkg archlinux:latest bash -c '
+# The container's builder user owns everything makepkg writes; hand the files back to the host user before
+# exiting (even when makepkg fails), or the runner can't read the package or clean up $work.
+docker run --rm -v "$work:/pkg" -w /pkg -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" archlinux:latest bash -c '
+  trap "chown -R \"$HOST_UID:$HOST_GID\" /pkg" EXIT
   pacman -Syu --noconfirm --needed base-devel >/dev/null &&
   useradd -m builder &&
   chown -R builder /pkg &&

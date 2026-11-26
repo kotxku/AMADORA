@@ -355,6 +355,22 @@ pub fn start_update_check(
     modals::generic::show_modal(window, cx, title, t::instance::content::update::check::error().into(), modal_action);
 }
 
+pub fn start_mod_doctor(
+    instance: InstanceID,
+    backend_handle: &BackendHandle,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let modal_action = ModalAction::default();
+
+    backend_handle.send(MessageToBackend::RunModDoctor {
+        instance,
+        modal_action: modal_action.clone(),
+    });
+
+    modals::generic::show_modal(window, cx, "Mod Doctor".into(), "Mod Doctor couldn't finish".into(), modal_action);
+}
+
 pub fn update_single_mod(
     instance: InstanceID,
     mod_id: InstanceContentID,

@@ -208,6 +208,10 @@ pub enum MessageToBackend {
         modal_action: ModalAction,
     },
     DownloadAllMetadata,
+    RunModDoctor {
+        instance: InstanceID,
+        modal_action: ModalAction,
+    },
     UpdateCheck {
         instance: InstanceID,
         modal_action: ModalAction

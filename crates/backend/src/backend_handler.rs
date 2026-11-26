@@ -476,6 +476,27 @@ impl BackendState {
             MessageToBackend::DownloadAllMetadata => {
                 self.download_all_metadata().await;
             },
+            MessageToBackend::RunModDoctor { instance: id, modal_action } => {
+                let target = self.instance_state.read().instances.get(id).map(|instance| {
+                    let configuration = instance.configuration.get();
+                    (instance.dot_minecraft_path.clone(), configuration.minecraft_version, configuration.loader)
+                });
+                let Some((dot_minecraft, minecraft_version, loader)) = target else {
+                    modal_action.set_finished_with_error("Can't run Mod Doctor, unknown instance".into());
+                    return;
+                };
+
+                let this = self.clone();
+                tokio::spawn(async move {
+                    let tracker = modal_action.push_tracker("Mod Doctor: checking for missing mods".into());
+                    let client = this.http_client_provider.client();
+                    let report = crate::mod_doctor::fix_missing_mods(&client, &dot_minecraft, minecraft_version.as_str(), loader).await;
+                    tracker.set_finished(ProgressTrackerFinishType::Normal);
+                    this.send.send_info(report);
+                    modal_action.set_finished();
+                    this.send.send(MessageToFrontend::Refresh);
+                });
+            },
             MessageToBackend::InstallContent { content, modal_action } => {
                 let this = self.clone();
 
@@ -488,28 +509,39 @@ impl BackendState {
             MessageToBackend::CreateInstanceFromFile { file, modal_action } => {
                 let summary = self.mod_metadata_manager.get_path(&file);
 
-                // right now only .mrpack importing is used
-                let ContentType::ModrinthModpack { dependencies, .. } = &summary.extra else {
-                    modal_action.set_finished_with_error("Not a .mrpack file".into());
-                    return;
+                let (name, minecraft_version, loader) = match &summary.extra {
+                    ContentType::ModrinthModpack { dependencies, .. } => {
+                        let mut minecraft_version = None;
+                        let mut loader = Loader::Vanilla;
+                        for (key, value) in dependencies {
+                            match &**key {
+                                "forge" => loader = Loader::Forge,
+                                "neoforge" => loader = Loader::NeoForge,
+                                "fabric-loader" => loader = Loader::Fabric,
+                                "minecraft" => minecraft_version = Some(value.clone()),
+                                _ => {}
+                            }
+                        }
+                        (summary.name.clone(), minecraft_version, loader)
+                    },
+                    ContentType::CurseforgeModpack { minecraft, .. } => {
+                        (summary.name.clone(), minecraft.version.clone(), minecraft.get_loader().unwrap_or(Loader::Vanilla))
+                    },
+                    _ => {
+                        // AMADORA: Pandora instance exports and plain zips of a game folder
+                        let this = self.clone();
+                        tokio::spawn(async move {
+                            this.import_instance_archive(file, modal_action.clone()).await;
+                            this.send.send(MessageToFrontend::Refresh);
+                        });
+                        return;
+                    },
                 };
 
-                let Some(name) = summary.name.clone() else {
+                let Some(name) = name else {
                     modal_action.set_finished_with_error("Unable to determine name from modpack".into());
                     return;
                 };
-
-                let mut minecraft_version = None;
-                let mut loader = Loader::Vanilla;
-                for (key, value) in dependencies {
-                    match &**key {
-                        "forge" => loader = Loader::Forge,
-                        "neoforge" => loader = Loader::NeoForge,
-                        "fabric-loader" => loader = Loader::Fabric,
-                        "minecraft" => minecraft_version = Some(value.clone()),
-                        _ => {}
-                    }
-                }
 
                 let Some(minecraft_version) = minecraft_version else {
                     modal_action.set_finished_with_error("Unable to determine minecraft version from modpack".into());

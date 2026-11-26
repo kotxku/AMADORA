@@ -150,6 +150,36 @@ impl Render for ImportPage {
                             });
                         })
                     })))
+                .child(Button::new("archive")
+                    .label("From a zip (Pandora export, CurseForge pack or .minecraft folder)")
+                    .w_full()
+                    .on_click(cx.listener(|page, _, window, cx| {
+                        let receiver = cx.prompt_for_paths(PathPromptOptions {
+                            files: true,
+                            directories: false,
+                            multiple: false,
+                            prompt: Some("Select an instance or modpack zip".into())
+                        });
+                        let page_entity = cx.entity();
+                        page._open_file_task = window.spawn(cx, async move |cx| {
+                            let Ok(Ok(Some(result))) = receiver.await else {
+                                return;
+                            };
+                            let Some(path) = result.first() else {
+                                return;
+                            };
+                            _ = page_entity.update_in(cx, |page, window, cx| {
+                                let modal_action = ModalAction::default();
+
+                                page.backend_handle.send(MessageToBackend::CreateInstanceFromFile {
+                                    file: path.clone(),
+                                    modal_action: modal_action.clone(),
+                                });
+
+                                crate::modals::generic::show_notification(window, cx, "Couldn't import the archive".into(), modal_action);
+                            });
+                        })
+                    })))
             );
 
         if let Some(import_from) = self.import_from {

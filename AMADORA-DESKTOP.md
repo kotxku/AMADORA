@@ -4,12 +4,17 @@ This desktop work uses the Pandora Launcher Rust desktop code, with AMADORA bran
 
 ## Parity status
 
-This is a desktop foundation, not yet a 1:1 port of the iOS application. Pandora's desktop code already handles Minecraft instances, Microsoft accounts, Modrinth and CurseForge content, and modpack import. The following AMADORA iOS features still need desktop implementations and validation before a parity release:
+This is a desktop foundation, not yet a 1:1 port of the iOS application. Pandora's desktop code already handles Minecraft instances, Microsoft accounts, Modrinth and CurseForge content, and modpack import.
 
-- Horizon 26.3 setup, launch, and per-instance Horizon mod, shader, and resource pack controls.
-- AMADORA's archive importer behavior for Pandora instance ZIPs, including nested `.mrpack` expansion and its import report.
-- Mod Doctor dependency scanning and safe download of missing Fabric or Quilt mods.
-- Controller navigation for the launcher. Game controller support also needs testing in Minecraft and Horizon on each desktop platform; vanilla Java Minecraft does not supply the iOS touch controls.
+Ported from AMADORA iOS:
+
+- **Archive importer.** Import > *From a zip* takes a Pandora instance export (a folder with `info_v1.json`), a CurseForge modpack zip, or a plain zip of a game folder (whichever folder holds `mods/`, `saves/` or `config/`). Zip entries that would escape the instance folder are refused. A plain zip's loader and Minecraft version are read from its mods. When the mods don't say, the latest release is used and the report says so. Pandora's installed `.mrpack` files stay in `mods/`, because the desktop launcher unpacks them at launch. The import report appears as a notification, and Mod Doctor runs on Fabric imports.
+- **Mod Doctor.** The *Mod Doctor* button on a Fabric instance's Mods page reads every `fabric.mod.json` (including jar-in-jar), applies `config/fabric_loader_dependencies.json` overrides, and downloads missing required dependencies from Modrinth for the instance's Minecraft version. Files are SHA-1 checked. It only installs a project whose slug or title matches the mod id. Mods switched off as `.jar.disabled` count as present. Desktop has no Quilt loader, and Forge/NeoForge `mods.toml` dependencies are not checked. The iOS step that switches off native-code mods (C2ME, PhysX, OpenCL) is not needed on desktop.
+
+Still missing before a parity release:
+
+- Horizon 26.3 setup, launch, and per-instance Horizon mod, shader, and resource pack controls. This needs desktop builds of Horizon itself; the iOS integration patches Horizon for iOS only.
+- Controller navigation for the launcher. This needs a gamepad input crate (for example `gilrs`) added to the vendored dependencies. Game controller support also needs testing in Minecraft and Horizon on each desktop platform; vanilla Java Minecraft does not supply the iOS touch controls.
 
 Keyboard and mouse work through the native desktop UI. The desktop build does not render on-screen game controls. Do not label the build as iOS feature parity until the gaps above are implemented and tested on Windows and Linux.
 

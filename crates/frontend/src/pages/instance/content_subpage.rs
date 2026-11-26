@@ -306,6 +306,15 @@ impl Render for InstanceContentSubpage {
                     crate::root::start_update_check(instance_id, &backend_handle, window, cx);
                 }
             }))
+            .when(matches!(self.content_type, ContentType::Mods) && self.instance_loader == Loader::Fabric, |this| {
+                this.child(Button::new("mod_doctor").label("Mod Doctor").compact().small().on_click({
+                    let backend_handle = self.backend_handle.clone();
+                    let instance_id = self.instance;
+                    move |_, window, cx| {
+                        crate::root::start_mod_doctor(instance_id, &backend_handle, window, cx);
+                    }
+                }))
+            })
             .child(DropdownButton::new("addcontent")
                 .success()
                 .small()
