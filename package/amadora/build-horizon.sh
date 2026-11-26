@@ -28,6 +28,7 @@ cd "$src"
 [ -d .git ] || git init -q .
 from=
 while read -r repo; do
+  repo=${repo%$'\r'}
   case "$repo" in '' | '#'*) continue ;; esac
   if git fetch -q --depth 1 "https://github.com/$repo.git" "$commit" 2>/dev/null; then
     from=$repo
@@ -46,6 +47,10 @@ python=$(command -v python3 || command -v python)
 work=${RUNNER_TEMP:-/tmp}/horizon-minecraft
 "$python" "$here/fetch_minecraft.py" research-lock.json "$work"
 [ -n "${JAVA_HOME:-}" ] || { echo "::error::JAVA_HOME must be a JDK 25"; exit 1; }
+# compile-exporters --prepare imports the pinned jars first; upstream refuses --prepare there, so a horizon-prepare
+# with that one check relaxed (the iOS build's patch has the same hunk) compiles them. The shipped programs are
+# built afterwards from the unpatched source.
+git apply "$here/compile-exporters.patch"
 cargo build --release --locked -p horizon-prepare --bin horizon-prepare
 rm -rf .local/exporters
 bundle=$("target/release/horizon-prepare$exe" compile-exporters --prepare --root "$PWD" --java-home "$JAVA_HOME" \
@@ -59,6 +64,7 @@ cp -R "$bundle/server" "$bundle/client" "$bundle/manifest.json" exporters/
 stray=$(find exporters -type f ! -path exporters/manifest.json \
   ! \( -name '*.class' \( -path 'exporters/server/dev/horizonlab/parity/*' -o -path 'exporters/client/dev/horizonlab/parity/*' \) \))
 [ -z "$stray" ] || { echo "::error::not one of Horizon's classes: $stray"; exit 1; }
+git checkout -q -- crates/horizon-prepare/src/main.rs
 
 # The game and its tools, then Horizon's own release folder layout
 if [ -n "$exe" ]; then

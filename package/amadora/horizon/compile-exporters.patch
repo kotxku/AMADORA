@@ -1,0 +1,15 @@
+diff --git a/crates/horizon-prepare/src/main.rs b/crates/horizon-prepare/src/main.rs
+index 786c74b..11ce7cc 100644
+--- a/crates/horizon-prepare/src/main.rs
++++ b/crates/horizon-prepare/src/main.rs
+@@ -129,7 +129,9 @@ fn main() -> ExitCode {
+             }
+         };
+         let parsed = match flag.as_str() {
+-            "--prepare" | "--server-jar" | "--check" if assets.is_some() => {
++            "--prepare" | "--server-jar" | "--check"
++                if assets.as_deref().is_some_and(|a| a != "compile-exporters") =>
++            {
+                 Err(format!("{flag} is for preparing, not for asset copying"))
+             }
+             "--prepare" if inline.is_none() => {
