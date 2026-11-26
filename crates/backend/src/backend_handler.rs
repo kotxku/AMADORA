@@ -477,7 +477,7 @@ impl BackendState {
                 self.download_all_metadata().await;
             },
             MessageToBackend::RunModDoctor { instance: id, modal_action } => {
-                let target = self.instance_state.read().instances.get(id).map(|instance| {
+                let target = self.instance_state.write().instances.get_mut(id).map(|instance| {
                     let configuration = instance.configuration.get();
                     (instance.dot_minecraft_path.clone(), configuration.minecraft_version, configuration.loader)
                 });
