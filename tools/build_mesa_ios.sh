@@ -33,6 +33,12 @@ grep -q 'AMADORA: no debug names' "$NAMES" || perl -0pi -e 's|(spirv_builder_emi
    return; /* AMADORA: no debug names */|' "$NAMES"
 grep -q 'AMADORA: no debug names' "$NAMES" || { echo "spirv_builder_emit_name not patched"; exit 1; }
 
+# The iOS 26.5 SDK has an <endian.h>, so meson sets HAVE_ENDIAN_H and u_endian.h takes its glibc branch, whose
+# macros Apple's header doesn't define. Use Mesa's own Apple branch (machine/endian.h) first.
+ENDIAN="$SRC/src/util/u_endian.h"
+sed -i '' 's|^#ifdef HAVE_ENDIAN_H$|#if defined(HAVE_ENDIAN_H) \&\& !defined(__APPLE__) /* AMADORA */|' "$ENDIAN"
+grep -q 'AMADORA' "$ENDIAN" || { echo "u_endian.h not patched"; exit 1; }
+
 SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
 CC="$(xcrun --sdk iphoneos -f clang)"
 CXX="$(xcrun --sdk iphoneos -f clang++)"
