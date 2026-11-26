@@ -16,6 +16,8 @@ struct CreateInstanceModalState {
     minecraft_version_dropdown: Entity<SelectState<VersionList>>,
     name_input_state: Entity<InputState>,
     selected_loader: Loader,
+    /// Horizon 26.3 (Minecraft rewritten in Rust) in place of a loader: the version list doesn't apply.
+    horizon_selected: bool,
     loaded_versions: bool,
     error_loading_versions: Option<SharedString>,
     name_invalid: bool,
@@ -74,6 +76,7 @@ impl CreateInstanceModalState {
             minecraft_version_dropdown,
             name_input_state,
             selected_loader: Loader::Vanilla,
+            horizon_selected: false,
             loaded_versions: false,
             error_loading_versions: None,
             name_invalid: false,
@@ -247,24 +250,30 @@ impl CreateInstanceModalState {
                 .child(
                     Button::new("loader-vanilla")
                         .label(t::instance::vanilla())
-                        .selected(self.selected_loader == Loader::Vanilla),
+                        .selected(!self.horizon_selected && self.selected_loader == Loader::Vanilla),
                 )
                 .child(
                     Button::new("loader-fabric")
                         .label(t::modrinth::category::fabric())
-                        .selected(self.selected_loader == Loader::Fabric),
+                        .selected(!self.horizon_selected && self.selected_loader == Loader::Fabric),
                 )
                 .child(
                     Button::new("loader-forge")
                         .label(t::modrinth::category::forge())
-                        .selected(self.selected_loader == Loader::Forge),
+                        .selected(!self.horizon_selected && self.selected_loader == Loader::Forge),
                 )
                 .child(
                     Button::new("loader-neoforge")
                         .label(t::modrinth::category::neoforge())
-                        .selected(self.selected_loader == Loader::NeoForge),
+                        .selected(!self.horizon_selected && self.selected_loader == Loader::NeoForge),
+                )
+                .child(
+                    Button::new("loader-horizon")
+                        .label("Horizon 26.3")
+                        .selected(self.horizon_selected),
                 )
                 .on_click(cx.listener(move |this, selected: &Vec<usize>, _, _| {
+                    this.horizon_selected = selected.first() == Some(&4);
                     match selected.first() {
                         Some(0) => this.selected_loader = Loader::Vanilla,
                         Some(1) => this.selected_loader = Loader::Fabric,
@@ -327,6 +336,19 @@ impl CreateInstanceModalState {
                     .child(Button::new("ok").flex_1().label(t::common::ok())
                         .on_click(cx.listener(move |this, _, window, cx| {
                             if name_is_invalid {
+                                return;
+                            }
+                            if this.horizon_selected {
+                                // Horizon plays 26.3 only: the version list doesn't apply
+                                let mut name = this.name_input_state.read(cx).value().clone();
+                                if name.is_empty() {
+                                    name = "Horizon".into();
+                                }
+                                this.backend_handle.send(MessageToBackend::CreateHorizonInstance {
+                                    name: name.as_str().into(),
+                                    icon: this.icon.clone(),
+                                });
+                                window.close_dialog(cx);
                                 return;
                             }
                             let Some(selected_version) = this.minecraft_version_dropdown.read(cx).selected_value().cloned() else {

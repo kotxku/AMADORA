@@ -1329,6 +1329,10 @@ impl BackendState {
     }
 
     pub fn create_instance_sanitized(&self, name: &str, version: &str, loader: Loader, icon: Option<EmbeddedOrRaw>) -> Option<PathBuf> {
+        self.create_instance_sanitized_with(name, InstanceConfiguration::new(version.into(), loader), icon)
+    }
+
+    pub fn create_instance_sanitized_with(&self, name: &str, configuration: InstanceConfiguration, icon: Option<EmbeddedOrRaw>) -> Option<PathBuf> {
         let mut name = sanitize_filename::sanitize_with_options(name, sanitize_filename::Options { windows: true, ..Default::default() });
 
         if self.instance_state.read().instances.iter().any(|i| i.name == name) {
@@ -1342,10 +1346,14 @@ impl BackendState {
             }
         }
 
-        return self.create_instance(&name, version, loader, icon);
+        return self.create_instance_with(&name, configuration, icon);
     }
 
     pub fn create_instance(&self, name: &str, version: &str, loader: Loader, icon: Option<EmbeddedOrRaw>) -> Option<PathBuf> {
+        self.create_instance_with(name, InstanceConfiguration::new(version.into(), loader), icon)
+    }
+
+    pub fn create_instance_with(&self, name: &str, configuration: InstanceConfiguration, icon: Option<EmbeddedOrRaw>) -> Option<PathBuf> {
         log::info!("Creating instance {name}");
         if !crate::fs::is_single_component_path_str(&name) {
             self.send.send_warning(format!("Unable to create instance, name must not be a path: {}", name));
@@ -1366,7 +1374,7 @@ impl BackendState {
 
         _ = std::fs::create_dir_all(&instance_dir);
 
-        let mut instance_info = InstanceConfiguration::new(version.into(), loader);
+        let mut instance_info = configuration;
 
         match icon {
             Some(EmbeddedOrRaw::Embedded(e)) => {

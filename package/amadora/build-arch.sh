@@ -6,6 +6,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cp package/amadora/PKGBUILD package/amadora/amadora.desktop package/amadora_icons/icon_256x256.png LICENSE "$work/"
 cp target/x86_64-unknown-linux-gnu/release/pandora_launcher "$work/"
+if [ -d target/horizon ]; then cp -R target/horizon "$work/horizon"; fi
 chmod -R a+rwX "$work"
 # The container's builder user owns everything makepkg writes; hand the files back to the host user before
 # exiting (even when makepkg fails), or the runner can't read the package or clean up $work.

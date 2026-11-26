@@ -66,6 +66,10 @@ pub enum MessageToBackend {
         loader: Loader,
         icon: Option<EmbeddedOrRaw>,
     },
+    CreateHorizonInstance {
+        name: Ustr,
+        icon: Option<EmbeddedOrRaw>,
+    },
     DeleteInstance {
         id: InstanceID,
     },

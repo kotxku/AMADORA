@@ -39,6 +39,10 @@ pub struct InstanceConfiguration {
     pub sandbox: bool, // Default sandbox to false when loading old configuration json
     #[serde(default, skip_serializing_if = "crate::skip_if_none", deserialize_with = "crate::try_deserialize")]
     pub group: Option<Arc<str>>,
+    /// Plays Horizon (Minecraft: Java Edition 26.3 rewritten in Rust) instead of Java Minecraft: the instance's
+    /// .minecraft is Horizon's game folder (saves, options, resourcepacks/, shaderpacks/, content-mods/).
+    #[serde(default, deserialize_with = "crate::try_deserialize", skip_serializing_if = "std::ops::Not::not")]
+    pub horizon: bool,
 }
 
 impl InstanceConfiguration {
@@ -60,6 +64,7 @@ impl InstanceConfiguration {
             show_shader_tab: false,
             sandbox: false,  // todo: for now, off by default. In the future, turn this on by default
             group: None,
+            horizon: false,
         }
     }
 }
@@ -347,4 +352,25 @@ fn get_shared_library_path_for_name(name: &str) -> Option<Arc<Path>> {
     }
 
     None
+}
+
+/// The Minecraft version every Horizon instance plays.
+pub const HORIZON_MINECRAFT_VERSION: &str = "26.3";
+
+impl InstanceConfiguration {
+    /// A Horizon instance's configuration: Vanilla 26.3, played by Horizon.
+    pub fn new_horizon() -> Self {
+        let mut configuration = Self::new(HORIZON_MINECRAFT_VERSION.into(), Loader::Vanilla);
+        configuration.horizon = true;
+        configuration
+    }
+
+    /// What the instance list shows in place of the loader: "Horizon" for a Horizon instance.
+    pub fn loader_label(&self) -> &'static str {
+        if self.horizon {
+            "Horizon"
+        } else {
+            self.loader.pretty_name()
+        }
+    }
 }

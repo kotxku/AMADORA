@@ -32,7 +32,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install Linux libraries
         if: runner.os == 'Linux'
-        run: sudo apt-get update --yes && sudo apt-get install --yes libssl-dev libdbus-1-dev libx11-xcb1 libxkbcommon-x11-dev pkg-config libseccomp-dev libfontconfig-dev libudev-dev libgl1 libvulkan1 dpkg-dev flatpak flatpak-builder rpm
+        run: sudo apt-get update --yes && sudo apt-get install --yes libssl-dev libdbus-1-dev libx11-xcb1 libxkbcommon-x11-dev pkg-config libseccomp-dev libfontconfig-dev libudev-dev libasound2-dev libgl1 libvulkan1 dpkg-dev flatpak flatpak-builder rpm
+      # Horizon (Minecraft 26.3 in Rust) for Horizon instances: package/amadora/build-horizon.sh, pinned in
+      # package/amadora/horizon/COMMIT. Its release folder goes beside AMADORA in every package.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Cache Horizon build
+        uses: actions/cache@v4
+        with:
+          path: target/horizon
+          key: horizon-${{ matrix.target }}-${{ hashFiles('package/amadora/horizon/*', 'package/amadora/build-horizon.sh') }}
+      - name: Build Horizon
+        shell: bash
+        run: bash package/amadora/build-horizon.sh
       - name: Build
         run: cargo build --release --frozen -p pandora_launcher --target ${{ matrix.target }}
       - name: Check Linux shared libraries
@@ -65,7 +79,8 @@ jobs:
           mkdir -p dist
           cp target/${{ matrix.target }}/release/pandora_launcher dist/AMADORA
           cp LICENSE dist/LICENSE
-          tar -czf AMADORA-Linux-x86_64.tar.gz -C dist AMADORA LICENSE
+          cp -R target/horizon dist/horizon
+          tar -czf AMADORA-Linux-x86_64.tar.gz -C dist AMADORA LICENSE horizon
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh
@@ -73,7 +88,8 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item "target/${{ matrix.target }}/release/pandora_launcher.exe" dist/AMADORA.exe
           Copy-Item LICENSE dist/LICENSE
-          Compress-Archive -Path dist/AMADORA.exe,dist/LICENSE -DestinationPath AMADORA-Windows-x86_64.zip
+          Copy-Item -Recurse target/horizon dist/horizon
+          Compress-Archive -Path dist/AMADORA.exe,dist/LICENSE,dist/horizon -DestinationPath AMADORA-Windows-x86_64.zip
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}

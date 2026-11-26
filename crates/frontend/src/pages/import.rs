@@ -151,7 +151,7 @@ impl Render for ImportPage {
                         })
                     })))
                 .child(Button::new("archive")
-                    .label("From a zip (Pandora export, CurseForge pack or .minecraft folder)")
+                    .label("From a zip (Pandora export, CurseForge pack, Horizon modpack or .minecraft folder)")
                     .w_full()
                     .on_click(cx.listener(|page, _, window, cx| {
                         let receiver = cx.prompt_for_paths(PathPromptOptions {

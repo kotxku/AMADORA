@@ -89,6 +89,9 @@ impl BackendState {
             MessageToBackend::RequestLoadContentFolder { id, content_folder } => {
                 tokio::task::spawn(Instance::load_content(self.clone(), id, content_folder));
             },
+            MessageToBackend::CreateHorizonInstance { name, icon } => {
+                self.create_horizon_instance(&name, icon);
+            },
             MessageToBackend::CreateInstance { name, version, loader, icon } => {
                 self.create_instance(&name, &version, loader, icon);
             },
@@ -2011,12 +2014,15 @@ impl BackendState {
         }
         modal_action.clear_trackers();
 
-        tokio::select! {
-            _ = self.prelaunch(id, &modal_action) => {},
-            _ = modal_action.request_cancel.cancelled() => {
-                return;
-            }
-        };
+        // Horizon plays no Java mods: nothing for the Java prelaunch (mod syncing) to do
+        if !configuration.horizon {
+            tokio::select! {
+                _ = self.prelaunch(id, &modal_action) => {},
+                _ = modal_action.request_cancel.cancelled() => {
+                    return;
+                }
+            };
+        }
 
         if modal_action.get_finished_at().is_some() || modal_action.has_requested_cancel() {
             return;
@@ -2024,7 +2030,16 @@ impl BackendState {
         modal_action.clear_trackers();
 
         let launch_tracker = modal_action.push_tracker("Launching".into());
-        let result = self.launcher.launch(&self.http_client_provider.redirecting(), dot_minecraft, configuration, quick_play, login_info, live_game_output.is_some(), &launch_tracker, &modal_action).await;
+        let result = if configuration.horizon {
+            tokio::select! {
+                result = self.launch_horizon(&dot_minecraft, login_info, live_game_output.is_some(), &launch_tracker, &modal_action) => {
+                    result.map_err(LaunchError::Horizon)
+                },
+                _ = modal_action.request_cancel.cancelled() => Err(LaunchError::CancelledByUser),
+            }
+        } else {
+            self.launcher.launch(&self.http_client_provider.redirecting(), dot_minecraft, configuration, quick_play, login_info, live_game_output.is_some(), &launch_tracker, &modal_action).await
+        };
 
         if matches!(result, Err(LaunchError::CancelledByUser)) {
             return;

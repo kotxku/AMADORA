@@ -1,0 +1,8 @@
+# Where build-horizon.sh fetches Horizon's pinned commit (COMMIT) from, in order. A commit's SHA fixes its whole
+# tree, so every source that has the commit gives the same files. horizon-rust/horizon, the upstream repository,
+# is gone from GitHub since November 2026; the others are public copies that still carry the commit.
+horizon-rust/horizon
+Rayan-XOO/horizon
+GoyDevv/Horizon-Android
+nobuildersnotools/horizon-web
+shopifygav222/horizon-pocket-edition-ios

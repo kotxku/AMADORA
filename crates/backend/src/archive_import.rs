@@ -24,6 +24,8 @@ pub struct ArchiveImport {
     pub loader: Loader,
     pub minecraft_version: Ustr,
     pub notes: Vec<String>,
+    /// A Horizon modpack, played by Horizon
+    pub horizon: bool,
 }
 
 /// Turns a zip entry name into safe relative path components. Zip entries are untrusted: absolute paths, `..`,
@@ -55,9 +57,20 @@ enum Layout {
     Pandora { base: Vec<String>, configuration: InstanceConfiguration },
     /// Folder (as components) holding mods/, saves/ or config/
     GameFolder { root: Vec<String> },
+    /// Folder (as components) holding horizon-modpack.json: a Horizon modpack (AMADORA iOS's export-horizon-modpack.ps1)
+    HorizonModpack { base: Vec<String> },
 }
 
 fn detect_layout<R: Read + Seek>(archive: &mut zip::ZipArchive<R>, entries: &[Entry]) -> Result<Layout, String> {
+    // A Horizon modpack's manifest decides first: its content mods hold no info_v1.json or mods/
+    if let Some(manifest) = entries
+        .iter()
+        .filter(|e| !e.is_dir && e.components.last().map(String::as_str) == Some("horizon-modpack.json"))
+        .min_by_key(|e| e.components.len())
+    {
+        return Ok(Layout::HorizonModpack { base: manifest.components[..manifest.components.len() - 1].to_vec() });
+    }
+
     // The metadata file closest to the archive root decides the format
     if let Some(info) = entries
         .iter()
@@ -189,6 +202,7 @@ pub fn import_archive(
 
     let (prefix, target_subdir, mut name) = match &layout {
         Layout::Pandora { base, .. } => (base.clone(), None, base.last().cloned().unwrap_or(file_stem)),
+        Layout::HorizonModpack { base } => (base.clone(), Some(".minecraft"), base.last().cloned().unwrap_or(file_stem)),
         Layout::GameFolder { root } => {
             let name = match root.last().map(String::as_str) {
                 Some(".minecraft" | "minecraft") if root.len() >= 2 => root[root.len() - 2].clone(),
@@ -239,6 +253,7 @@ pub fn import_archive(
         tracker.add_count(1);
     }
 
+    let mut horizon = false;
     let (loader, minecraft_version) = match layout {
         Layout::Pandora { configuration, .. } => {
             let mrpacks = std::fs::read_dir(temp_dir.join(".minecraft").join("mods"))
@@ -247,6 +262,17 @@ pub fn import_archive(
             if mrpacks > 0 {
                 notes.push(format!("Kept {mrpacks} installed modpack(s) in mods/. AMADORA unpacks them when the instance launches."));
             }
+            (configuration.loader, configuration.minecraft_version)
+        }
+        Layout::HorizonModpack { .. } => {
+            horizon = true;
+            for folder in ["resourcepacks", "shaderpacks", crate::horizon::CONTENT_MODS_FOLDER] {
+                _ = std::fs::create_dir_all(extract_root.join(folder));
+            }
+            let mut configuration = InstanceConfiguration::new_horizon();
+            configuration.show_shader_tab = true;
+            let json = serde_json::to_string(&configuration).map_err(|e| e.to_string())?;
+            crate::fs::write_safe(&temp_dir.join("info_v1.json"), json.as_bytes()).map_err(|e| e.to_string())?;
             (configuration.loader, configuration.minecraft_version)
         }
         Layout::GameFolder { .. } => {
@@ -276,7 +302,7 @@ pub fn import_archive(
         .map_err(|e| format!("Couldn't move the imported instance into place: {e}"))?;
     scopeguard::ScopeGuard::into_inner(cleanup);
 
-    Ok(ArchiveImport { instance_dir, name, loader, minecraft_version, notes })
+    Ok(ArchiveImport { instance_dir, name, loader, minecraft_version, notes, horizon })
 }
 
 #[cfg(test)]
@@ -339,7 +365,8 @@ impl crate::BackendState {
             },
         };
 
-        let mut report = format!("Imported \"{}\" ({} {}).", import.name, import.loader.pretty_name(), import.minecraft_version);
+        let loader_label = if import.horizon { "Horizon" } else { import.loader.pretty_name() };
+        let mut report = format!("Imported \"{}\" ({} {}).", import.name, loader_label, import.minecraft_version);
         for note in &import.notes {
             report.push_str("\n\n");
             report.push_str(note);

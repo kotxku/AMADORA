@@ -286,7 +286,7 @@ impl InstanceEntry {
     fn create_title(&self) -> SharedString {
         let lower = self.name.to_ascii_lowercase();
 
-        let loader_string = self.configuration.loader.pretty_name();
+        let loader_string = self.configuration.loader_label();
         let loader_string_lower = loader_string.to_ascii_lowercase();
         let contains_loader = lower.contains(&loader_string_lower);
 

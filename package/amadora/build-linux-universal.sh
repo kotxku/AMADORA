@@ -3,6 +3,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 install -Dm755 target/x86_64-unknown-linux-gnu/release/pandora_launcher AppDir/usr/bin/amadora
 install -Dm644 package/amadora_icons/icon_256x256.png AppDir/usr/share/icons/hicolor/256x256/apps/amadora.png
+# Horizon's release folder (build-horizon.sh), beside AMADORA at usr/lib/amadora/horizon
+if [ -d target/horizon ]; then
+  rm -rf AppDir/usr/lib/amadora/horizon
+  mkdir -p AppDir/usr/lib/amadora
+  cp -R target/horizon AppDir/usr/lib/amadora/horizon
+fi
 mkdir -p AppDir/usr/share/applications
 cat > AppDir/usr/share/applications/amadora.desktop <<'DESKTOP'
 [Desktop Entry]

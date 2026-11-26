@@ -21,7 +21,12 @@ modules:
       - install -Dm644 io.github.kotxku.AMADORA.desktop /app/share/applications/io.github.kotxku.AMADORA.desktop
       - install -Dm644 io.github.kotxku.AMADORA.metainfo.xml /app/share/metainfo/io.github.kotxku.AMADORA.metainfo.xml
       - install -Dm644 icon_256x256.png /app/share/icons/hicolor/256x256/apps/io.github.kotxku.AMADORA.png
+      # Horizon's release folder (build-horizon.sh), found by AMADORA at /app/lib/amadora/horizon
+      - mkdir -p /app/lib/amadora && cp -R horizon /app/lib/amadora/horizon
     sources:
+      - type: dir
+        path: ../../target/horizon
+        dest: horizon
       - type: file
         path: ../../target/x86_64-unknown-linux-gnu/release/pandora_launcher
       - type: file

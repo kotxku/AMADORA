@@ -24,6 +24,7 @@ mod launcher_import;
 mod log_reader;
 mod metadata;
 mod mod_doctor;
+mod horizon;
 mod mod_metadata;
 mod id_slab;
 mod persistent;

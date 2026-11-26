@@ -73,6 +73,8 @@ pub enum LaunchError {
     ForgePostProcessorError,
     #[error("Cancelled by user")]
     CancelledByUser,
+    #[error("{0}")]
+    Horizon(String),
     #[error("Loader supports the wrong version of Minecraft: {0}")]
     MismatchedLoaderVersions(Arc<str>),
 }
@@ -901,7 +903,7 @@ impl Launcher {
         Some(mirror.url.clone())
     }
 
-    async fn load_mojang_java_binary(
+    pub(crate) async fn load_mojang_java_binary(
         &self,
         meta: &MetadataManager,
         http_client: &reqwest::Client,
@@ -1022,7 +1024,7 @@ impl Launcher {
         result
     }
 
-    async fn load_assets(
+    pub(crate) async fn load_assets(
         &self,
         meta: &MetadataManager,
         http_client: &reqwest::Client,
@@ -1061,7 +1063,7 @@ impl Launcher {
         Ok(asset_index)
     }
 
-    async fn load_libraries(
+    pub(crate) async fn load_libraries(
         &self,
         http_client: &reqwest::Client,
         artifacts: &[GameLibraryArtifact],
