@@ -23,6 +23,6 @@ curl -fL --retry 3 https://github.com/linuxdeploy/linuxdeploy/releases/download/
 chmod +x linuxdeploy.AppImage
 OUTPUT=AMADORA-Linux-x86_64.AppImage APPIMAGE_EXTRACT_AND_RUN=1 ./linuxdeploy.AppImage --appdir AppDir --executable AppDir/usr/bin/amadora --desktop-file AppDir/usr/share/applications/amadora.desktop --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/amadora.png --output appimage
 flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install --user --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+flatpak install --user --noninteractive flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
 flatpak-builder --user --force-clean --repo=flatpak-repo flatpak-build package/amadora/io.github.kotxku.AMADORA.yml
 flatpak build-bundle flatpak-repo AMADORA-Linux-x86_64.flatpak io.github.kotxku.AMADORA desktop --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo

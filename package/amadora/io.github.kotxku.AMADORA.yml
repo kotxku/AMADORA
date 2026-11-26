@@ -1,9 +1,11 @@
 app-id: io.github.kotxku.AMADORA
 runtime: org.freedesktop.Platform
-runtime-version: '24.08'
+runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
 branch: desktop
 command: amadora
+# Ubuntu 22.04's flatpak-builder runs appstream-compose, which current SDKs no longer ship
+appstream-compose: false
 finish-args:
   - --share=network
   - --share=ipc
