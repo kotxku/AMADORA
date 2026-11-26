@@ -88,9 +88,15 @@ jobs:
       - name: Build Horizon for iOS
         run: |
           mkdir -p "$RUNNER_TEMP/horizon" && cd "$RUNNER_TEMP/horizon"
-          git init -q . && git remote add origin https://github.com/horizon-rust/horizon.git
-          git fetch -q --depth 1 origin 86a60b1b9670abba865e079b12d6f978c73d8cba
+          git init -q .
+          # horizon-rust/horizon is gone from GitHub since November 2026. The commit's SHA fixes its whole tree, so
+          # any public copy that still has it gives the same files.
+          commit=86a60b1b9670abba865e079b12d6f978c73d8cba
+          for repo in horizon-rust/horizon Rayan-XOO/horizon GoyDevv/Horizon-Android nobuildersnotools/horizon-web shopifygav222/horizon-pocket-edition-ios; do
+            git fetch -q --depth 1 "https://github.com/$repo.git" "$commit" 2>/dev/null && { echo "Horizon $commit from $repo"; break; }
+          done
           git checkout -q FETCH_HEAD
+          [ "$(git rev-parse HEAD)" = "$commit" ] || { echo "::error::No source has Horizon $commit"; exit 1; }
           cd "$GITHUB_WORKSPACE"
           bash tools/horizon/build_horizon_ios.sh "$RUNNER_TEMP/horizon" Natives/build/libhorizon_ios.dylib
           # Horizon's exporter classes for preparing 26.3 on the device (no Mojang files ship)
